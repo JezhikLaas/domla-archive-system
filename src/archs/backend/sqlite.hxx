@@ -6,6 +6,7 @@
 #include <tuple>
 #include <vector>
 #include <boost/any.hpp>
+#include <boost/iterator/iterator_facade.hpp>
 
 namespace Archive
 {
@@ -37,13 +38,49 @@ public:
     bool IsEmpty() const { return Value_.empty(); }
 };
 
+class ParameterRange
+{
+private:
+    std::vector<Parameter>& Parameters_;
+    
+public:
+    ParameterRange(std::vector<Parameter>& parameters)
+    : Parameters_(parameters)
+    { }
+    
+    class iterator : public boost::iterator_facade<iterator, Parameter, boost::random_access_traversal_tag>
+    {
+        public:
+            iterator()
+            { }
+        
+            iterator(std::vector<Parameter>::iterator position)
+            : Position_(position)
+            { }
+        
+        private:
+            friend class boost::iterator_core_access;
+            
+            std::vector<Parameter>::iterator Position_;
+            void increment() { ++Position_; }
+            void decrement() { --Position_; }
+            bool equal(iterator const& other) const
+            {
+                return Position_ == other.Position_;
+            }
+            Parameter& dereference() const { return *Position_; }
+    };
+
+    iterator begin() const { return iterator(Parameters_.begin()); }
+    iterator end() const { return iterator(Parameters_.end()); }
+    Parameter& operator[](const std::string key) const;
+};
+
 class Command
 {
 friend class Connection;
 
 private:
-    typedef std::tuple<std::vector<Parameter>::const_iterator, std::vector<Parameter>::const_iterator> ParameterRange;
-    
     struct Implementation;
     Implementation* Inner;
 
@@ -51,7 +88,7 @@ private:
     
 public:
     ~Command();
-    const ParameterRange Parameters() const;
+    const ParameterRange& Parameters() const;
     void Execute();
     template <typename T> T ExecuteScalar();
 };

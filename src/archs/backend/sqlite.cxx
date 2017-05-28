@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <initializer_list>
+#include <boost/algorithm/string.hpp>
 #include "sqlite.hxx"
 #include "sqlite/sqlite3.h"
 
@@ -13,7 +16,14 @@ int CheckAndThrow(int code, sqlite3* handle, int line, const char* file)
     return code;
 }
 
+int CheckAndThrow(int code, const initializer_list<int>& accepted, sqlite3* handle, int line, const char* file)
+{
+    if (count(accepted.begin(), accepted.end(), code) == 0) throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+    return code;
+}
+
 #define CHECK_AND_THROW(op, handle) CheckAndThrow(op, handle, __LINE__, __FILE__)
+#define CHECKS_AND_THROW(op, list, handle) CheckAndThrow(op, list, handle, __LINE__, __FILE__)
     
 } // anonymous namespace
 
@@ -46,7 +56,7 @@ struct Connection::Implementation
 struct Command::Implementation
 {
     Implementation(Command& owner)
-    : Owner(owner), Handle(nullptr)
+    : Owner(owner), Handle(nullptr), Parameters(ParameterList)
     { }
     
     ~Implementation()
@@ -57,7 +67,8 @@ struct Command::Implementation
     
     Command& Owner;
     sqlite3_stmt* Handle;
-    std::vector<Parameter> Parameters;
+    vector<Parameter> ParameterList;
+    ParameterRange Parameters;
     
     void Prepare(sqlite3* handle, const string& sql)
     {
@@ -71,8 +82,24 @@ struct Command::Implementation
         handle);
         
         for (int Index = 1; Index <= sqlite3_bind_parameter_count(Handle); ++Index) {
-            Parameters.push_back(Parameter(Owner, sqlite3_bind_parameter_name(Handle, Index) + 1));
+            ParameterList.push_back(Parameter(Owner, sqlite3_bind_parameter_name(Handle, Index) + 1));
         }
+    }
+    
+    int ExecuteScalarInt()
+    {
+        switch (CHECKS_AND_THROW(sqlite3_step(Handle), { SQLITE_ROW }, sqlite3_db_handle(Handle))) {
+            case SQLITE_ROW:
+                return sqlite3_column_int(Handle, 0);
+        }
+        
+        return 0;
+    }
+    
+    void Execute()
+    {
+        auto Accepted = { SQLITE_OK, SQLITE_DONE, SQLITE_ROW };
+        CHECKS_AND_THROW(sqlite3_step(Handle), Accepted, sqlite3_db_handle(Handle));
     }
 };
 
@@ -83,6 +110,18 @@ Parameter::Parameter(const Command& owner)
 Parameter::Parameter(const Command& owner, const string& name)
 : Owner_(owner), Name_(name)
 { }
+
+Parameter& ParameterRange::operator[](const std::string key) const
+{
+    auto Result = find_if(
+        Parameters_.begin(),
+        Parameters_.end(),
+        [&key](Parameter item) { return boost::algorithm::to_lower_copy(item.Name()) == boost::algorithm::to_lower_copy(key); }
+    );
+    if (Result == Parameters_.end()) throw runtime_error("key not found");
+    
+    return *Result;
+}
 
 Command::Command(const string& sql)
 : Inner(new Command::Implementation(*this))
@@ -96,19 +135,20 @@ Command::~Command()
     Inner = nullptr;
 }
 
-const tuple<vector<Parameter>::const_iterator, vector<Parameter>::const_iterator> Command::Parameters() const
+const ParameterRange& Command::Parameters() const
 {
-    return make_tuple(Inner->Parameters.begin(), Inner->Parameters.end());
+    return Inner->Parameters;
 }
 
 void Command::Execute()
 {
+    Inner->Execute();
 }
 
-template <typename T>
-T ExecuteScalar()
+template <>
+int Command::ExecuteScalar()
 {
-    
+    return Inner->ExecuteScalarInt();
 }
 
 Connection::Connection(const Configuration& configuration)
