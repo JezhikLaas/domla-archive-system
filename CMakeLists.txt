@@ -2,10 +2,12 @@ cmake_minimum_required(VERSION 3.8)
 
 project("Domla Archive")
 
+enable_testing()
 find_package(Ice)
 find_package(Boost)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/lib ${Ice_INCLUDE_DIR} SYSTEM ${Boost_INCLUDE_DIRS})
+file(GLOB TEST_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/tests/*.cc)
 
 add_custom_command(
     OUTPUT ../src/lib/Archive.cpp ../src/lib/Common.cpp ../src/lib/Authentication.cpp ../src/lib/Administrator.cpp
@@ -50,13 +52,44 @@ target_compile_definitions(
     PUBLIC SQLITE_THREADSAFE=2 SQLITE_DEFAULT_MEMSTATUS=0 SQLITE_ENABLE_FTS5
 )
 
+add_library(
+    backendlib STATIC
+    src/archs/backend/sqlite.cxx
+    src/archs/backend/document_schema.cxx
+)
+
 add_executable(
     archs
     src/archs/main.cxx
-    src/archs/backend/sqlite.cxx
 )
 
 target_link_libraries(
     archs
+    backendlib
     sqlitelib
+    archlib
 )
+
+foreach(testSrc ${TEST_SRCS})
+    get_filename_component(testName ${testSrc} NAME_WE)
+    add_executable(${testName} ${testSrc})
+
+    target_link_libraries(
+        ${testName}
+        backendlib
+        sqlitelib
+        archlib
+    )
+
+    set_target_properties(
+        ${testName} PROPERTIES 
+        RUNTIME_OUTPUT_DIRECTORY  ${CMAKE_CURRENT_SOURCE_DIR}/testBin
+    )
+
+    add_test(
+        NAME ${testName} 
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/testBin 
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testBin/${testName}
+    )
+endforeach(testSrc)
+

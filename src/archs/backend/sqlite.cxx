@@ -2,16 +2,118 @@
 #include "sqlite/sqlite3.h"
 
 using namespace std;
-using namespace Archive::Backend;
+using namespace Archive::Backend::SQLite;
+
+namespace
+{
+
+int CheckAndThrow(int code, sqlite3* handle, int line, const char* file)
+{
+    if (code != SQLITE_OK) throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+    return code;
+}
+
+#define CHECK_AND_THROW(op, handle) CheckAndThrow(op, handle, __LINE__, __FILE__)
+    
+} // anonymous namespace
 
 struct Connection::Implementation
 {
+    Implementation(Configuration configuration)
+    : Handle(nullptr), Setup(configuration)
+    { }
+    
+    ~Implementation()
+    {
+        if (Handle != nullptr) sqlite3_close(Handle);
+        Handle = nullptr;
+    }
+    
+    sqlite3* Handle;
+    Configuration Setup;
+    
+    void Open()
+    {
+        CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle, SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE, nullptr), Handle);
+    }
+    
+    void Create()
+    {
+        CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
+    }
 };
 
-Connection::Connection(const string& connectionString)
-: Inner(new Connection::Implementation())
+struct Command::Implementation
+{
+    Implementation(Command& owner)
+    : Owner(owner), Handle(nullptr)
+    { }
+    
+    ~Implementation()
+    {
+        if (Handle != nullptr) sqlite3_finalize(Handle);
+        Handle = nullptr;
+    }
+    
+    Command& Owner;
+    sqlite3_stmt* Handle;
+    std::vector<Parameter> Parameters;
+    
+    void Prepare(sqlite3* handle, const string& sql)
+    {
+        CHECK_AND_THROW(sqlite3_prepare_v2(
+            handle,
+            sql.c_str(),
+            -1,
+            &Handle,
+            nullptr
+        ),
+        handle);
+        
+        for (int Index = 1; Index <= sqlite3_bind_parameter_count(Handle); ++Index) {
+            Parameters.push_back(Parameter(Owner, sqlite3_bind_parameter_name(Handle, Index) + 1));
+        }
+    }
+};
+
+Parameter::Parameter(const Command& owner)
+: Owner_(owner)
+{ }
+
+Parameter::Parameter(const Command& owner, const string& name)
+: Owner_(owner), Name_(name)
+{ }
+
+Command::Command(const string& sql)
+: Inner(new Command::Implementation(*this))
 {
     
+}
+
+Command::~Command()
+{
+    delete Inner;
+    Inner = nullptr;
+}
+
+const tuple<vector<Parameter>::const_iterator, vector<Parameter>::const_iterator> Command::Parameters() const
+{
+    return make_tuple(Inner->Parameters.begin(), Inner->Parameters.end());
+}
+
+void Command::Execute()
+{
+}
+
+template <typename T>
+T ExecuteScalar()
+{
+    
+}
+
+Connection::Connection(const Configuration& configuration)
+: Inner(new Connection::Implementation(configuration))
+{
 }
 
 Connection::~Connection()
@@ -20,12 +122,29 @@ Connection::~Connection()
     Inner = nullptr;
 }
 
+void Connection::Open()
+{
+    Inner->Open();
+}
+
+void Connection::OpenNew()
+{
+    Inner->Create();
+}
+
 unique_ptr<Command> Connection::Create(const string& command)
 {
-    return unique_ptr<Command>(new Command());
+    auto Result = unique_ptr<Command>(new Command(command));
+    Result->Inner->Prepare(Inner->Handle, command);
+    return Result;
 }
 
 unique_ptr<Command> Connection::Create(const string& command, const Transaction& transaction)
 {
-    return unique_ptr<Command>(new Command());
+    return unique_ptr<Command>(new Command(command));
+}
+
+bool Connection::IsOpen() const
+{
+    return Inner->Handle != nullptr;
 }
