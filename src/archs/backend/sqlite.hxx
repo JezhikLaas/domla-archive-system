@@ -206,6 +206,7 @@ public:
     void OpenNew();
     void OpenAlways();
     Command Create(const std::string& command);
+    std::shared_ptr<Command> CreateFree(const std::string& command);
     Transaction Begin();
     bool IsOpen() const;
 };

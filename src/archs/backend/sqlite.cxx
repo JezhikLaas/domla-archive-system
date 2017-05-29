@@ -385,6 +385,13 @@ Command Connection::Create(const string& command)
     return Result;
 }
 
+shared_ptr<Command> Connection::CreateFree(const string& command)
+{
+    auto Result = shared_ptr<Command>(new Command(command));
+    Result->Inner->Prepare(Inner->Handle, command);
+    return Result;
+}
+
 bool Connection::IsOpen() const
 {
     return Inner->Handle != nullptr;
