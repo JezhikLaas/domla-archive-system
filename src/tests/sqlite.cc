@@ -516,3 +516,52 @@ BOOST_AUTO_TEST_CASE(ScopedRollbackRevertsChanges)
   BOOST_CHECK(Result == 1);
   }
 }
+
+BOOST_AUTO_TEST_CASE(ReusingPreparedStatement)
+{
+  Configuration Setup {
+      ":memory:"
+  };
+  
+  Connection Con(Setup);
+  Con.OpenNew();
+  
+  {
+  auto Target = Con.Create("CREATE TABLE a(one INT NOT NULL, two INT NOT NULL)");
+  Target.Execute();
+  }
+  
+  {
+  auto Target = Con.Create("INSERT INTO a (one, two) VALUES (:one, :two)");
+  Target.Parameters()["one"].SetValue(1);
+  Target.Parameters()["two"].SetValue(1);
+  Target.Execute();
+  
+  Target.Parameters()["one"].SetValue(2);
+  Target.Parameters()["two"].SetValue(2);
+  Target.Execute();
+  }
+  
+  auto Rows = 0;
+  {
+  auto Target = Con.Create("SELECT * FROM a");
+  auto Result = Target.Open();
+  
+  for (const ResultRow& Row : Result) ++Rows;
+  }
+  
+  BOOST_CHECK(Rows == 2);
+}
+
+BOOST_AUTO_TEST_CASE(CreateFreeCommand)
+{
+  Configuration Setup {
+      ":memory:"
+  };
+  
+  Connection Con(Setup);
+  Con.OpenNew();
+  
+  auto Target = Con.CreateFree("CREATE TABLE a(one INT, two INT)");
+  Target->Execute();
+}
