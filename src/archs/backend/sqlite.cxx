@@ -183,6 +183,11 @@ struct Command::Implementation
     }
 };
 
+struct Transaction::Implementation
+{
+    sqlite3* Handle;
+};
+
 Parameter::Parameter(const Command& owner)
 : Owner_(owner)
 { }
@@ -309,6 +314,13 @@ Command::Command(const string& sql)
     
 }
 
+Command::Command(Command&& other)
+: Inner(nullptr)
+{
+    Inner = other.Inner;
+    other.Inner = nullptr;
+}
+
 Command::~Command()
 {
     delete Inner;
@@ -336,6 +348,10 @@ ResultSet Command::Open()
     return Inner->Open();
 }
 
+Transaction::Transaction()
+: Inner(new Transaction::Implementation())
+{ }
+
 Connection::Connection(const Configuration& configuration)
 : Inner(new Connection::Implementation(configuration))
 {
@@ -362,19 +378,55 @@ void Connection::OpenAlways()
     Inner->CreateOrOpen();
 }
 
-unique_ptr<Command> Connection::Create(const string& command)
+Command Connection::Create(const string& command)
 {
-    auto Result = unique_ptr<Command>(new Command(command));
-    Result->Inner->Prepare(Inner->Handle, command);
+    auto Result = Command(command);
+    Result.Inner->Prepare(Inner->Handle, command);
     return Result;
-}
-
-unique_ptr<Command> Connection::Create(const string& command, const Transaction& transaction)
-{
-    return unique_ptr<Command>(new Command(command));
 }
 
 bool Connection::IsOpen() const
 {
     return Inner->Handle != nullptr;
+}
+
+Transaction::Transaction(Transaction&& other)
+: Inner(nullptr)
+{
+    Inner = other.Inner;
+    other.Inner = nullptr;
+}
+
+Transaction::~Transaction()
+{
+    try {
+        Rollback();
+    }
+    catch(...) { }
+    
+    delete Inner;
+    Inner = nullptr;
+}
+
+void Transaction::Commit()
+{
+    if (Inner == nullptr || Inner->Handle == nullptr) return;
+    CHECK_AND_THROW(sqlite3_exec(Inner->Handle, "COMMIT", nullptr, nullptr, nullptr), Inner->Handle);
+    Inner->Handle = nullptr;
+}
+
+void Transaction::Rollback()
+{
+    if (Inner == nullptr || Inner->Handle == nullptr) return;
+    CHECK_AND_THROW(sqlite3_exec(Inner->Handle, "ROLLBACK", nullptr, nullptr, nullptr), Inner->Handle);
+    Inner->Handle = nullptr;
+}
+
+Transaction Connection::Begin()
+{
+    Transaction Result;
+    CHECK_AND_THROW(sqlite3_exec(Inner->Handle, "BEGIN", nullptr, nullptr, nullptr), Inner->Handle);
+    Result.Inner->Handle = Inner->Handle;
+    
+    return Result;
 }

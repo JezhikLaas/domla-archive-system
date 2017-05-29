@@ -154,7 +154,11 @@ private:
     explicit Command(const std::string& sql);
     
 public:
+    Command(Command& other) = delete;
+    void operator= (Command& other) = delete;
+    Command(Command&& other);
     ~Command();
+    
     const ParameterSet& Parameters() const;
     void Execute();
     template <typename T> T ExecuteScalar();
@@ -163,6 +167,22 @@ public:
 
 class Transaction
 {
+friend class Connection;
+
+private:
+    struct Implementation;
+    Implementation* Inner;
+
+    Transaction();
+
+public:
+    Transaction(Transaction& other) = delete;
+    void operator= (Transaction& other) = delete;
+    Transaction(Transaction&& other);
+    ~Transaction();
+    
+    void Commit();
+    void Rollback();
 };
 
 struct Configuration
@@ -185,8 +205,8 @@ public:
     void Open();
     void OpenNew();
     void OpenAlways();
-    std::unique_ptr<Command> Create(const std::string& command);
-    std::unique_ptr<Command> Create(const std::string& command, const Transaction& transaction);
+    Command Create(const std::string& command);
+    Transaction Begin();
     bool IsOpen() const;
 };
 
