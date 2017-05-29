@@ -16,6 +16,7 @@ namespace SQLite
 {
     
 class Command;
+class ResultSet;
 
 class Parameter
 {
@@ -23,28 +24,32 @@ friend class Command;
 
 private:
     const Command& Owner_;
+    std::string RealName_;
     std::string Name_;
     boost::any Value_;
+    int RawSize_;
     explicit Parameter(const Command& owner);
-    explicit Parameter(const Command& owner, const std::string& name);
+    explicit Parameter(const Command& owner, const std::string& realName, const std::string& name);
 
 public:
     void SetName(const std::string& name) { Name_ = name; }
     const std::string& Name() const { return Name_; }
     template <typename T>
     void SetValue(T&& value) { Value_ = value; }
+    void SetRawValue(const void* data, int size);
     const boost::any& Value() const { return Value_; }
     void Clear() { Value_ = boost::any(); }
     bool IsEmpty() const { return Value_.empty(); }
+    int RawSize() const { return RawSize_; }
 };
 
-class ParameterRange
+class ParameterSet
 {
 private:
     std::vector<Parameter>& Parameters_;
     
 public:
-    ParameterRange(std::vector<Parameter>& parameters)
+    ParameterSet(std::vector<Parameter>& parameters)
     : Parameters_(parameters)
     { }
     
@@ -76,9 +81,71 @@ public:
     Parameter& operator[](const std::string key) const;
 };
 
+class ResultRow
+{
+private:
+    const ResultSet& Owner_;
+    
+public:
+    ResultRow(const ResultSet& owner)
+    : Owner_(owner)
+    { }
+    
+    ResultRow(const ResultRow&) = delete;
+    void operator= (const ResultRow&) = delete;
+    template <typename T> T Get(const std::string& name) const;
+    template <typename T> T Get(int index) const;
+    std::vector<unsigned char> GetBlob(int index) const;
+    std::vector<unsigned char> GetBlob(const std::string& name) const;
+    int ColumnIndex(const std::string& name) const;
+};
+
+class ResultSet
+{
+friend class ResultRow;
+
+private:
+    struct Implementation;
+    Implementation* Inner;
+    ResultRow Data_;
+    
+public:
+    ResultSet(const Command& command, bool data);
+    ResultSet(ResultSet&& other);
+    ~ResultSet();
+    ResultSet(const ResultSet&) = delete;
+    void operator= (const ResultSet&) = delete;
+    
+    class iterator : public boost::iterator_facade<iterator, const ResultRow, boost::forward_traversal_tag>
+    {
+        public:
+            iterator()
+            : Owner_(nullptr), Done_(true)
+            { }
+        
+            iterator(const ResultSet* result, bool done)
+            : Owner_(result), Done_(done)
+            { }
+        
+        private:
+            friend class boost::iterator_core_access;
+            const ResultSet* Owner_;
+            bool Done_;
+            
+            void increment();
+            bool equal(iterator const& other) const;
+            const ResultRow& dereference() const;
+    };
+
+    iterator begin();
+    iterator end();
+    int Fields() const;
+};
+
 class Command
 {
 friend class Connection;
+friend class ResultSet;
 
 private:
     struct Implementation;
@@ -88,9 +155,10 @@ private:
     
 public:
     ~Command();
-    const ParameterRange& Parameters() const;
+    const ParameterSet& Parameters() const;
     void Execute();
     template <typename T> T ExecuteScalar();
+    ResultSet Open();
 };
 
 class Transaction
@@ -116,6 +184,7 @@ public:
     
     void Open();
     void OpenNew();
+    void OpenAlways();
     std::unique_ptr<Command> Create(const std::string& command);
     std::unique_ptr<Command> Create(const std::string& command, const Transaction& transaction);
     bool IsOpen() const;
