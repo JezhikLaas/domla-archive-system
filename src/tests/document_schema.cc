@@ -9,9 +9,8 @@ using namespace Archive::Backend;
 
 BOOST_AUTO_TEST_CASE(SchemaCanBeCreatedTest)
 {
-  SQLite::Configuration Setup {
-      ":memory:"
-  };
+  SQLite::Configuration Setup;
+  Setup.Path = ":memory:";
   
   SQLite::Connection Con(Setup);
   Con.OpenNew();

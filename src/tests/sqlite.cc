@@ -10,9 +10,8 @@ using namespace Archive::Backend::SQLite;
 
 BOOST_AUTO_TEST_CASE(OpenConnectionInMemory)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Target(Setup);
   Target.OpenNew();
@@ -22,9 +21,8 @@ BOOST_AUTO_TEST_CASE(OpenConnectionInMemory)
 
 BOOST_AUTO_TEST_CASE(TablesCanBeCreatedInMemory)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -35,9 +33,8 @@ BOOST_AUTO_TEST_CASE(TablesCanBeCreatedInMemory)
 
 BOOST_AUTO_TEST_CASE(ErrorsAreProperlyReported)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -59,9 +56,8 @@ BOOST_AUTO_TEST_CASE(ErrorsAreProperlyReported)
 
 BOOST_AUTO_TEST_CASE(ExecuteScalarWorks)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -74,9 +70,8 @@ BOOST_AUTO_TEST_CASE(ExecuteScalarWorks)
 
 BOOST_AUTO_TEST_CASE(ParametersDetected)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -97,9 +92,8 @@ BOOST_AUTO_TEST_CASE(ParametersDetected)
 
 BOOST_AUTO_TEST_CASE(ParametersAccessibleByName)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -119,9 +113,8 @@ BOOST_AUTO_TEST_CASE(ParametersAccessibleByName)
 
 BOOST_AUTO_TEST_CASE(ParametersNameAccessCaseInsensitive)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -139,9 +132,8 @@ BOOST_AUTO_TEST_CASE(ParametersNameAccessCaseInsensitive)
 
 BOOST_AUTO_TEST_CASE(InsertingValuesIntoMemory)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -168,9 +160,8 @@ BOOST_AUTO_TEST_CASE(InsertingValuesIntoMemory)
 
 BOOST_AUTO_TEST_CASE(OpeningResultSet)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -197,9 +188,8 @@ BOOST_AUTO_TEST_CASE(OpeningResultSet)
 
 BOOST_AUTO_TEST_CASE(CountingRowsInResultSet)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -229,9 +219,8 @@ BOOST_AUTO_TEST_CASE(CountingRowsInResultSet)
 
 BOOST_AUTO_TEST_CASE(ReadValuesFromResultRow)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -266,9 +255,8 @@ BOOST_AUTO_TEST_CASE(ReadValuesFromResultRow)
 
 BOOST_AUTO_TEST_CASE(WriteAndReadBinaryData)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -301,9 +289,8 @@ BOOST_AUTO_TEST_CASE(WriteAndReadBinaryData)
 
 BOOST_AUTO_TEST_CASE(WriteAndReadText)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -336,9 +323,8 @@ BOOST_AUTO_TEST_CASE(WriteAndReadText)
 
 BOOST_AUTO_TEST_CASE(WriteAndReadTextFromCharacterPointer)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -370,9 +356,8 @@ BOOST_AUTO_TEST_CASE(WriteAndReadTextFromCharacterPointer)
 
 BOOST_AUTO_TEST_CASE(WriteAndReadBinaryDataFromPointer)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -412,9 +397,8 @@ BOOST_AUTO_TEST_CASE(WriteAndReadBinaryDataFromPointer)
 
 BOOST_AUTO_TEST_CASE(RollbackRevertsChanges)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -448,9 +432,8 @@ BOOST_AUTO_TEST_CASE(RollbackRevertsChanges)
 
 BOOST_AUTO_TEST_CASE(CommitWritesChanges)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -484,9 +467,8 @@ BOOST_AUTO_TEST_CASE(CommitWritesChanges)
 
 BOOST_AUTO_TEST_CASE(ScopedRollbackRevertsChanges)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -519,9 +501,8 @@ BOOST_AUTO_TEST_CASE(ScopedRollbackRevertsChanges)
 
 BOOST_AUTO_TEST_CASE(ReusingPreparedStatement)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
   
   Connection Con(Setup);
   Con.OpenNew();
@@ -555,9 +536,23 @@ BOOST_AUTO_TEST_CASE(ReusingPreparedStatement)
 
 BOOST_AUTO_TEST_CASE(CreateFreeCommand)
 {
-  Configuration Setup {
-      ":memory:"
-  };
+  Configuration Setup;
+  Setup.Path = ":memory:";
+  
+  Connection Con(Setup);
+  Con.OpenNew();
+  
+  auto Target = Con.CreateFree("CREATE TABLE a(one INT, two INT)");
+  Target->Execute();
+}
+
+BOOST_AUTO_TEST_CASE(NonDefaultConfiguration)
+{
+  Configuration Setup;
+  Setup.Path = "";
+  Setup.ForeignKeys = true;
+  Setup.PageSize = 65536;
+  Setup.Journal = Configuration::JournalMode::Wal;
   
   Connection Con(Setup);
   Con.OpenNew();

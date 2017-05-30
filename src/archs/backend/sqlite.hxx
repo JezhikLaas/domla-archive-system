@@ -188,7 +188,41 @@ public:
 
 struct Configuration
 {
+    enum class JournalMode
+    {
+        Delete,
+        Truncate,
+        Persist,
+        Memory,
+        Wal,
+        Off
+    };
+    
+    enum class IsolationLevel
+    {
+        Serializable,
+        ReadUncommitted
+    };
+    
+    Configuration()
+    {
+        BusyTimeout = 0;
+        CacheSize = -2000;
+        ForeignKeys = false;
+        Journal = JournalMode::Delete;
+        TransactionIsolation = IsolationLevel::Serializable;
+        MaxPageCount = 0;
+        PageSize = 4096;
+    }
+    
     std::string Path;
+    int BusyTimeout;
+    int CacheSize;
+    bool ForeignKeys;
+    JournalMode Journal;
+    IsolationLevel TransactionIsolation;
+    int MaxPageCount;
+    int PageSize;
 };
 
 class Connection

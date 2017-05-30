@@ -46,9 +46,166 @@ struct Connection::Implementation
     sqlite3* Handle;
     Configuration Setup;
     
+    int ReadSingleInteger(const string& sql)
+    {
+        sqlite3_stmt* Statement = nullptr;
+        try {
+            CHECK_AND_THROW(sqlite3_prepare_v2(
+                Handle,
+                sql.c_str(),
+                -1,
+                &Statement,
+                nullptr
+            ),
+            Handle);
+            
+            CHECKS_AND_THROW(sqlite3_step(Statement), { SQLITE_ROW }, Handle);
+            
+            auto Result = sqlite3_column_int(Statement, 0);
+            sqlite3_finalize(Statement);
+            
+            return Result;
+        }
+        catch(...) {
+            if (Statement != nullptr) sqlite3_finalize(Statement);
+            throw;
+        }
+    }
+    
+    string ReadSingleString(const string& sql)
+    {
+        sqlite3_stmt* Statement = nullptr;
+        try {
+            CHECK_AND_THROW(sqlite3_prepare_v2(
+                Handle,
+                sql.c_str(),
+                -1,
+                &Statement,
+                nullptr
+            ),
+            Handle);
+            
+            CHECKS_AND_THROW(sqlite3_step(Statement), { SQLITE_ROW }, Handle);
+            
+            auto Result = reinterpret_cast<const char*>(sqlite3_column_text(Statement, 0));
+            sqlite3_finalize(Statement);
+            
+            return Result;
+        }
+        catch(...) {
+            if (Statement != nullptr) sqlite3_finalize(Statement);
+            throw;
+        }
+    }
+    
+    Configuration ReadCurrentSetup()
+    {
+        Configuration Result;
+        
+        Result.BusyTimeout = ReadSingleInteger("PRAGMA busy_timeout");
+        Result.CacheSize = ReadSingleInteger("PRAGMA cache_size");
+        Result.ForeignKeys = ReadSingleInteger("PRAGMA foreign_keys") == 1;
+        Result.MaxPageCount = ReadSingleInteger("PRAGMA max_page_count");
+        Result.PageSize = ReadSingleInteger("PRAGMA page_size");
+        Result.TransactionIsolation = ReadSingleInteger("PRAGMA read_uncommitted") == 0 ? Configuration::IsolationLevel::Serializable : Configuration::IsolationLevel::ReadUncommitted;
+        
+        auto Journal = ReadSingleString("PRAGMA journal_mode");
+        
+        if (Journal == "wal") {
+            Result.Journal = Configuration::JournalMode::Wal;
+        }
+        else if (Journal == "delete") {
+            Result.Journal = Configuration::JournalMode::Delete;
+        }
+        else if (Journal == "truncate") {
+            Result.Journal = Configuration::JournalMode::Truncate;
+        }
+        else if (Journal == "persist") {
+            Result.Journal = Configuration::JournalMode::Persist;
+        }
+        else if (Journal == "memory") {
+            Result.Journal = Configuration::JournalMode::Memory;
+        }
+        else {
+            Result.Journal = Configuration::JournalMode::Off;
+        }
+        
+        return Result;
+    }
+    
+    void ApplySetup()
+    {
+        auto Modified = false;
+        auto Current = ReadCurrentSetup();
+        Current.Path = Setup.Path;
+        
+        if (Setup.PageSize != Current.PageSize) {
+            auto ResetMode = false;
+            if (Current.Journal == Configuration::JournalMode::Wal) {
+                ResetMode = true;
+                CHECK_AND_THROW(sqlite3_exec(Handle, "PRAGMA journal_mode=DELETE", nullptr, nullptr, nullptr), Handle);
+            }
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA page_size=") + to_string(Setup.PageSize)).c_str(), nullptr, nullptr, nullptr), Handle);
+            CHECK_AND_THROW(sqlite3_exec(Handle, "VACUUM", nullptr, nullptr, nullptr), Handle);
+            
+            if (ResetMode) CHECK_AND_THROW(sqlite3_exec(Handle, "PRAGMA journal_mode=wal", nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+        if (Setup.BusyTimeout != Current.BusyTimeout) {
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA busy_timeout=") + to_string(Setup.BusyTimeout)).c_str(), nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+        if (Setup.CacheSize != Current.CacheSize) {
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA cache_size=") + to_string(Setup.CacheSize)).c_str(), nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+        if (Setup.ForeignKeys != Current.ForeignKeys) {
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA foreign_keys=") + (Setup.ForeignKeys ? "1" : "0")).c_str(), nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+        if (Setup.MaxPageCount != Current.MaxPageCount) {
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA max_page_count=") + to_string(Setup.MaxPageCount)).c_str(), nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+        if (Setup.Journal != Current.Journal) {
+            string Mode = "delete";
+            switch (Setup.Journal) {
+                case Configuration::JournalMode::Delete:
+                    Mode = "delete";
+                    break;
+                case Configuration::JournalMode::Truncate:
+                    Mode = "truncate";
+                    break;
+                case Configuration::JournalMode::Persist:
+                    Mode = "persist";
+                    break;
+                case Configuration::JournalMode::Memory:
+                    Mode = "memory";
+                    break;
+                case Configuration::JournalMode::Wal:
+                    Mode = "wal";
+                    break;
+                case Configuration::JournalMode::Off:
+                    Mode = "off";
+                    break;
+            }
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA journal_mode=") + Mode).c_str(), nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+        if (Setup.TransactionIsolation != Current.TransactionIsolation) {
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA read_uncommitted=") + (Setup.TransactionIsolation == Configuration::IsolationLevel::ReadUncommitted ? "1" : "0")).c_str(), nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+        if (Setup.TransactionIsolation != Current.TransactionIsolation) {
+            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA read_uncommitted=") + (Setup.TransactionIsolation == Configuration::IsolationLevel::ReadUncommitted ? "1" : "0")).c_str(), nullptr, nullptr, nullptr), Handle);
+            Modified = true;
+        }
+    }
+    
     void Open()
     {
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle, SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE, nullptr), Handle);
+        ApplySetup();
     }
     
     void Create()
@@ -58,12 +215,15 @@ struct Connection::Implementation
             if (boost::filesystem::is_regular_file(FilePath)) THROW((boost::format("file %1% exists") % Setup.Path).str());
             if (boost::filesystem::is_directory(FilePath)) THROW((boost::format("directory %1% exists") % Setup.Path).str());
         }
+        
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
+        ApplySetup();
     }
     
     void CreateOrOpen()
     {
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
+        ApplySetup();
     }
     
     void AlwaysCreate()
@@ -73,7 +233,9 @@ struct Connection::Implementation
             if (boost::filesystem::is_directory(FilePath)) THROW((boost::format("directory %1% exists") % Setup.Path).str());
             if (boost::filesystem::is_regular_file(FilePath)) boost::filesystem::remove(FilePath);
         }
+        
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
+        ApplySetup();
     }
 };
 
@@ -136,11 +298,11 @@ struct Command::Implementation
                 sqlite3_bind_double(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), (double)boost::any_cast<float>(Item.Value_));
             }
             else if (Item.Value().type() == typeid(string)) {
-                const string& Buffer = boost::any_cast<const string&>(Item.Value_);
+                auto& Buffer = boost::any_cast<const string&>(Item.Value_);
                 sqlite3_bind_text(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), Buffer.c_str(), -1, nullptr);
             }
             else if (Item.Value().type() == typeid(vector<unsigned char>)) {
-				const vector<unsigned char>& Buffer = boost::any_cast<const vector<unsigned char>&>(Item.Value_);
+				auto& Buffer = boost::any_cast<const vector<unsigned char>&>(Item.Value_);
                 const void* Pointer = Buffer.empty() ? nullptr : &Buffer[0];
                 sqlite3_bind_blob(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), Pointer, Buffer.size(), nullptr);
             }

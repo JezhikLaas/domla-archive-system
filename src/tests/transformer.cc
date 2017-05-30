@@ -60,9 +60,8 @@ protected:
 
 BOOST_AUTO_TEST_CASE(InsertQueueTest)
 {
-  SQLite::Configuration Setup {
-      ":memory:"
-  };
+  SQLite::Configuration Setup;
+  Setup.Path = ":memory:";
   
   TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
   
@@ -93,9 +92,8 @@ BOOST_AUTO_TEST_CASE(InsertQueueTest)
 
 BOOST_AUTO_TEST_CASE(UpdateQueueTest)
 {
-  SQLite::Configuration Setup {
-      ":memory:"
-  };
+  SQLite::Configuration Setup;
+  Setup.Path = ":memory:";
   
   TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
   
@@ -141,9 +139,8 @@ BOOST_AUTO_TEST_CASE(UpdateQueueTest)
 
 BOOST_AUTO_TEST_CASE(DeleteQueueTest)
 {
-  SQLite::Configuration Setup {
-      ":memory:"
-  };
+  SQLite::Configuration Setup;
+  Setup.Path = ":memory:";
   
   TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
   
@@ -190,9 +187,8 @@ BOOST_AUTO_TEST_CASE(DeleteQueueTest)
 
 BOOST_AUTO_TEST_CASE(LoadFromTransformerTest)
 {
-  SQLite::Configuration Setup {
-      ":memory:"
-  };
+  SQLite::Configuration Setup;
+  Setup.Path = ":memory:";
   
   TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
   
