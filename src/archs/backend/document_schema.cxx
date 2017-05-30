@@ -1,4 +1,7 @@
+#include "document_schema.hxx"
+
 using namespace std;
+using namespace Archive::Backend;
 
 namespace {
 
@@ -58,3 +61,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS DocumentContents_IDX1 ON DocumentContents(
 )";
 
 } // anonymous namespace
+
+void DocumentSchema::Ensure(const SQLite::Connection& connection)
+{
+    auto Command = connection.Create(SchemaCommand);
+    Command.Execute();
+}
