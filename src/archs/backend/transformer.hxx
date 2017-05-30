@@ -2,6 +2,8 @@
 #define TRANSFORMER_HXX
 
 #include <algorithm>
+#include <functional>
+#include <memory>
 #include <string>
 #include <typeindex>
 #include <unordered_map>
@@ -19,36 +21,64 @@ protected:
     std::string Id_;
     
 public:
+    static const std::string TypeId_;
+    
+    virtual const std:: string& TypeId() const { return TypeId_; }
     const std::string& Id() const { return Id_; }
+    void SetId(const std::string& value) { Id_ = value; }
 };
 
 class TransformerBase
 {
-private:
-    SQLite::Command* InsertCommand;
-    SQLite::Command* UpdateCommand;
-    SQLite::Command* DeleteCommand;
-    SQLite::Command* SelectCommand;
+protected:
+    const SQLite::Connection* Connection_;
     
-protected:
-    virtual const std::string& Inserter() const = 0;
-    virtual const std::string& Updater() const = 0;
-    virtual const std::string& Deleter() const = 0;
-    virtual const std::string& Selector() const = 0;
+    std::shared_ptr<SQLite::Command> InsertCommand_;
+    std::shared_ptr<SQLite::Command> UpdateCommand_;
+    std::shared_ptr<SQLite::Command> DeleteCommand_;
+    std::shared_ptr<SQLite::Command> SelectCommand_;
+    
+    std::string StandardInsert() const;
+    std::string StandardUpdate() const;
+    std::string StandardDelete() const;
+    std::string StandardSelect() const;
+    std::vector<std::string> AppendFields(const std::vector<std::string>& fields) const;
+    
+    virtual std::string Inserter() const { return StandardInsert(); }
+    virtual std::string Updater() const { return StandardUpdate(); }
+    virtual std::string Deleter() const { return StandardDelete(); }
+    virtual std::string Selector() const { return StandardSelect(); }
+    virtual void ToInsert(const Persistable& item) const = 0;
+    virtual void ToUpdate(const Persistable& item) const = 0;
+    virtual void ToDelete(const Persistable& item) const = 0;
+    virtual void FromData(const SQLite::ResultRow& data, Persistable& item) const = 0;
+    virtual std::string TableName() const = 0;
+    virtual std::vector<std::string> Fields() const { return { "id" }; }
 
-protected:
+public:
     void Delete(const Persistable& item);
     void Insert(const Persistable& item);
     void Update(const Persistable& item);
-    void Connect(const SQLite::Connection& connection);
+    bool Load(Persistable& item);
+    void Connect(const SQLite::Connection* connection);
 
 public:
     virtual const std::type_info& PersistingType() const = 0;
+    void Reset();
 };
 
 template <typename T>
 class Transformer : public TransformerBase
 {
+protected:
+    virtual void Serialize(const SQLite::ParameterSet& target, const T& item) const = 0;
+    virtual void Materialize(const SQLite::ResultRow& data, T& item) const = 0;
+    
+    void ToInsert(const Persistable& item) const override { Serialize(InsertCommand_->Parameters(), (const T&) item); }
+    void ToUpdate(const Persistable& item) const override { Serialize(UpdateCommand_->Parameters(), (const T&) item); }
+    void ToDelete(const Persistable& item) const override { DeleteCommand_->Parameters()["id"].SetValue(item.Id()); }
+    void FromData(const SQLite::ResultRow& data, Persistable& item) const override { Materialize(data, (T&) item); }
+    
 public:
     const std::type_info& PersistingType() const
     {
@@ -59,37 +89,42 @@ public:
 class TransformerQueue
 {
 private:
-    std::vector<Persistable> Deletes_;
-    std::vector<Persistable> Updates_;
-    std::vector<Persistable> Inserts_;
+    SQLite::Connection* Connection_;
+    std::vector<const Persistable*> Deletes_;
+    std::vector<const Persistable*> Updates_;
+    std::vector<const Persistable*> Inserts_;
 
 public:
+    TransformerQueue(SQLite::Connection* Connection_);
+    
     void Insert(const Persistable& item)
     {
-        Inserts_.push_back(item);
+        Inserts_.push_back(&item);
     }
 
     void Update(const Persistable& item)
     {
-        Updates_.push_back(item);
+        Updates_.push_back(&item);
     }
 
     void Delete(const Persistable& item)
     {
-        Deletes_.push_back(item);
+        Deletes_.push_back(&item);
     }
     
     void Flush();
 };
 
+typedef std::function<TransformerBase*()> TransformerFactory;
+
 class TransformerRegistry
 {
 private:
-    static std::unordered_map<std::type_index, TransformerBase*> Transformers_;
+    static std::unordered_map<std::string, TransformerFactory> Transformers_;
 
 public:
-    static void Register(const std::type_info& id, TransformerBase* transformer);
-    static TransformerBase& Fetch(const std::type_info& id);
+    static void Register(const std::string& id, TransformerFactory transformer);
+    static TransformerBase* Fetch(const std::string& id);
 };
 
 } // namespace Backend

@@ -283,6 +283,11 @@ int ResultSet::Fields() const
     return sqlite3_column_count(Inner->Handle);
 }
 
+bool ResultSet::HasData() const
+{
+    return Inner->Data;
+}
+
 ResultSet::iterator ResultSet::begin()
 {
     return iterator(this, Inner->Data == false);
@@ -378,14 +383,14 @@ void Connection::OpenAlways()
     Inner->CreateOrOpen();
 }
 
-Command Connection::Create(const string& command)
+Command Connection::Create(const string& command) const
 {
     auto Result = Command(command);
     Result.Inner->Prepare(Inner->Handle, command);
     return Result;
 }
 
-shared_ptr<Command> Connection::CreateFree(const string& command)
+shared_ptr<Command> Connection::CreateFree(const string& command) const
 {
     auto Result = shared_ptr<Command>(new Command(command));
     Result->Inner->Prepare(Inner->Handle, command);

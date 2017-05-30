@@ -1,36 +1,182 @@
+#include <sstream>
+#include <boost/format.hpp>
 #include "transformer.hxx"
 
 using namespace std;
+using namespace boost;
 using namespace Archive::Backend;
 
-std::unordered_map<std::type_index, TransformerBase*> TransformerRegistry::Transformers_;
+unordered_map<string, TransformerFactory> TransformerRegistry::Transformers_;
+const string Persistable::TypeId_ = "Persistable";
+
+string TransformerBase::StandardInsert() const
+{
+    stringstream Buffer;
+    Buffer << "INSERT INTO " << TableName() << " (";
+    auto First = true;
+    for (auto& Field : Fields()) {
+        if (First == false) { Buffer << ", "; }
+        First = false;
+        Buffer << Field;
+    }
+    
+    Buffer << ") VALUES (";
+    
+    First = true;
+    for (auto& Field : Fields()) {
+        if (First == false) { Buffer << ", "; }
+        First = false;
+        Buffer << ':' << Field;
+    }
+    
+    Buffer << ')';
+    return Buffer.str();
+}
+
+string TransformerBase::StandardUpdate() const
+{
+    stringstream Buffer;
+    Buffer << "UPDATE " << TableName() << " SET ";
+    auto First = true;
+    for (auto& Field : Fields()) {
+        if (Field == "id") continue;
+        if (First == false) { Buffer << ", "; }
+        First = false;
+        Buffer << Field << " = " << ':' << Field;
+    }
+    
+    Buffer << " WHERE id = :id";
+    
+    return Buffer.str();
+}
+
+string TransformerBase::StandardDelete() const
+{
+    stringstream Buffer;
+    Buffer << "DELETE FROM " << TableName() << " WHERE id = :id ";
+    
+    return Buffer.str();
+}
+
+string TransformerBase::StandardSelect() const
+{
+    stringstream Buffer;
+    Buffer << "SELECT ";
+    auto First = true;
+    for (auto& Field : Fields()) {
+        if (First == false) { Buffer << ", "; }
+        First = false;
+        Buffer << Field;
+    }
+    
+    Buffer << " FROM " << TableName() << " WHERE id = :id";
+    
+    return Buffer.str();
+}
 
 void TransformerBase::Delete(const Persistable& item)
 {
+    if (DeleteCommand_ == false) DeleteCommand_ = Connection_->CreateFree(Deleter());
+    ToDelete(item);
+    DeleteCommand_->Execute();
 }
 
 void TransformerBase::Insert(const Persistable& item)
 {
+    if (InsertCommand_ == false) InsertCommand_ = Connection_->CreateFree(Inserter());
+    ToInsert(item);
+    InsertCommand_->Execute();
 }
 
 void TransformerBase::Update(const Persistable& item)
 {
+    if (UpdateCommand_ == false) UpdateCommand_ = Connection_->CreateFree(Updater());
+    ToUpdate(item);
+    UpdateCommand_->Execute();
 }
 
-void TransformerBase::Connect(const SQLite::Connection& connection)
+bool TransformerBase::Load(Persistable& item)
 {
+    if (SelectCommand_ == false) SelectCommand_ = Connection_->CreateFree(Selector());
+    SelectCommand_->Parameters()["id"].SetValue(item.Id());
+    auto& Result = SelectCommand_->Open();
+    if (Result.HasData()) FromData(*Result.begin(), item);
+    return Result.HasData();
 }
+
+vector<string> TransformerBase::AppendFields(const vector<string>& fields) const
+{
+    auto& Result = TransformerBase::Fields();
+    back_insert_iterator<vector<string>> Appender(Result);
+    copy(fields.begin(), fields.end(), Appender);
+    
+    return Result;
+}
+
+void TransformerBase::Connect(const SQLite::Connection* connection)
+{
+    Connection_ = connection;
+}
+
+void TransformerBase::Reset()
+{
+    Connection_ = nullptr;
+    InsertCommand_.reset();
+    DeleteCommand_.reset();
+    UpdateCommand_.reset();
+    SelectCommand_.reset();
+}
+
+TransformerQueue::TransformerQueue(SQLite::Connection* connection)
+: Connection_(connection)
+{ }
 
 void TransformerQueue::Flush()
 {
+    auto Scope = Connection_->Begin();
+    unordered_map<string, unique_ptr<TransformerBase>> Cache;
+    
+    for (auto& Delete : Deletes_) {
+        auto Key = Delete->TypeId();
+        if (Cache.find(Key) == Cache.end()) {
+            Cache.insert({ Key, unique_ptr<TransformerBase>(TransformerRegistry::Fetch(Key)) });
+            Cache[Key]->Connect(Connection_);
+        }
+        Cache[Key]->Delete(*Delete);
+    }
+    
+    for (auto& Insert : Inserts_) {
+        auto Key = Insert->TypeId();
+        if (Cache.find(Key) == Cache.end()) {
+            Cache.insert({ Key, unique_ptr<TransformerBase>(TransformerRegistry::Fetch(Key)) });
+            Cache[Key]->Connect(Connection_);
+        }
+        Cache[Key]->Insert(*Insert);
+    }
+    
+    for (auto& Update : Updates_) {
+        auto Key = Update->TypeId();
+        if (Cache.find(Key) == Cache.end()) {
+            Cache.insert({ Key, unique_ptr<TransformerBase>(TransformerRegistry::Fetch(Key)) });
+            Cache[Key]->Connect(Connection_);
+        }
+        Cache[Key]->Update(*Update);
+    }
+    
+    Deletes_.clear();
+    Updates_.clear();
+    Inserts_.clear();
+    
+    Scope.Commit();
 }
 
-void TransformerRegistry::Register(const std::type_info& id, TransformerBase* transformer)
+void TransformerRegistry::Register(const string& id, TransformerFactory transformer)
 {
-    Transformers_.insert({ type_index(id), transformer });
+    Transformers_.insert({ id, transformer });
 }
 
-TransformerBase& TransformerRegistry::Fetch(const std::type_info& id)
+TransformerBase* TransformerRegistry::Fetch(const string& id)
 {
-    return *Transformers_[type_index(id)];
+    auto Factory = Transformers_[id];
+    return Factory();
 }

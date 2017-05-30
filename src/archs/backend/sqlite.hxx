@@ -140,6 +140,7 @@ public:
     iterator begin();
     iterator end();
     int Fields() const;
+    bool HasData() const;
 };
 
 class Command
@@ -205,8 +206,8 @@ public:
     void Open();
     void OpenNew();
     void OpenAlways();
-    Command Create(const std::string& command);
-    std::shared_ptr<Command> CreateFree(const std::string& command);
+    Command Create(const std::string& command) const;
+    std::shared_ptr<Command> CreateFree(const std::string& command) const;
     Transaction Begin();
     bool IsOpen() const;
 };
