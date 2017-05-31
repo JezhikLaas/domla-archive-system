@@ -204,27 +204,15 @@ struct Configuration
         ReadUncommitted
     };
     
-    Configuration()
-    {
-        BusyTimeout = 0;
-        CacheSize = -2000;
-        ForeignKeys = false;
-        Journal = JournalMode::Delete;
-        TransactionIsolation = IsolationLevel::Serializable;
-        MaxPageCount = 0;
-        PageSize = 4096;
-        ReadOnly = false;
-    }
-    
     std::string Path;
-    int BusyTimeout;
-    int CacheSize;
-    bool ForeignKeys;
-    JournalMode Journal;
-    IsolationLevel TransactionIsolation;
-    int MaxPageCount;
-    int PageSize;
-    bool ReadOnly;
+    int BusyTimeout { 0 };
+    int CacheSize { -2000 };
+    bool ForeignKeys { false };
+    JournalMode Journal { JournalMode::Delete };
+    IsolationLevel TransactionIsolation { IsolationLevel::Serializable };
+    int MaxPageCount { 0 };
+    int PageSize { 4096 };
+    bool ReadOnly { false };
 };
 
 class Connection

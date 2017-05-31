@@ -57,6 +57,7 @@ add_library(
     src/archs/backend/sqlite.cxx
     src/archs/backend/data_bucket.cxx
     src/archs/backend/document_schema.cxx
+    src/archs/backend/document_storage.cxx
     src/archs/backend/transformer.cxx
 )
 
