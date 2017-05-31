@@ -55,6 +55,7 @@ target_compile_definitions(
 add_library(
     backendlib STATIC
     src/archs/backend/sqlite.cxx
+    src/archs/backend/data_bucket.cxx
     src/archs/backend/document_schema.cxx
     src/archs/backend/transformer.cxx
 )

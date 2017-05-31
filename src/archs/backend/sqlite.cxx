@@ -204,7 +204,13 @@ struct Connection::Implementation
     
     void Open()
     {
-        CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle, SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE, nullptr), Handle);
+        auto Flags = Setup.ReadOnly
+                     ?
+                     SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY
+                     :
+                     SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE;
+                     
+        CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle, Flags, nullptr), Handle);
         ApplySetup();
     }
     

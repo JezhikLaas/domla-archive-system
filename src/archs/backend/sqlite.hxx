@@ -213,6 +213,7 @@ struct Configuration
         TransactionIsolation = IsolationLevel::Serializable;
         MaxPageCount = 0;
         PageSize = 4096;
+        ReadOnly = false;
     }
     
     std::string Path;
@@ -223,6 +224,7 @@ struct Configuration
     IsolationLevel TransactionIsolation;
     int MaxPageCount;
     int PageSize;
+    bool ReadOnly;
 };
 
 class Connection
