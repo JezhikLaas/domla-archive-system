@@ -175,7 +175,7 @@ protected:
         item.History = data.Get<std::string>("Owner");
         item.Revision = data.Get<int>("SeqId");
         item.Checksum = data.Get<std::string>("Checksum");
-        item.Content = data.Get<std::vector<unsigned char>>("data");
+        item.Content = data.GetBlob("data");
     }
     
     void Serialize(const SQLite::ParameterSet& target, const Access::DocumentContent& item) const override

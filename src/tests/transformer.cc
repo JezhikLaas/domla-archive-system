@@ -8,11 +8,12 @@
 #include <vector>
 #include <boost/test/unit_test.hpp>
 #include "archs/backend/transformer.hxx"
+#include "lib/Common.h"
 
 using namespace std;
 using namespace Archive::Backend;
 
-class Test : public Persistable
+class Test : public Common::Persistable
 {
 friend class TestTransformer;
 
@@ -21,15 +22,11 @@ private:
     string Value_;
     
 public:
-    static string TypeId_;
-    const string& TypeId() const override { return Test::TypeId_; }
     int Amount() const { return Amount_; }
     string Value() const { return Value_; }
     void SetAmount(int value) { Amount_ = value; }
     void SetValue(const string& value) { Value_ = value; }
 };
-
-string Test::TypeId_ = "Test";
 
 class TestTransformer : Transformer<Test>
 {
@@ -52,7 +49,7 @@ protected:
     
     void Serialize(const SQLite::ParameterSet& target, const Test& item) const override
     {
-        target["id"].SetValue(item.Id());
+        target["id"].SetValue(item.Id);
         target["amount"].SetValue(item.Amount());
         target["value"].SetValue(item.Value());
     }
@@ -63,7 +60,7 @@ BOOST_AUTO_TEST_CASE(InsertQueueTest)
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";
   
-  TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
+  TransformerRegistry::Register(Test::ice_staticId(), []() { return (TransformerBase*)new TestTransformer(); });
   
   SQLite::Connection Con(Setup);
   Con.OpenNew();
@@ -74,7 +71,7 @@ BOOST_AUTO_TEST_CASE(InsertQueueTest)
   }
   
   Test Item;
-  Item.SetId("1");
+  Item.Id = "1";
   Item.SetAmount(10);
   Item.SetValue("Box");
   
@@ -95,7 +92,7 @@ BOOST_AUTO_TEST_CASE(UpdateQueueTest)
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";
   
-  TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
+  TransformerRegistry::Register(Test::ice_staticId(), []() { return (TransformerBase*)new TestTransformer(); });
   
   SQLite::Connection Con(Setup);
   Con.OpenNew();
@@ -114,7 +111,7 @@ BOOST_AUTO_TEST_CASE(UpdateQueueTest)
   }
   
   Test Item;
-  Item.SetId("1");
+  Item.Id = "1";
   Item.SetAmount(10);
   Item.SetValue("Box");
   
@@ -142,7 +139,7 @@ BOOST_AUTO_TEST_CASE(DeleteQueueTest)
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";
   
-  TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
+  TransformerRegistry::Register(Test::ice_staticId(), []() { return (TransformerBase*)new TestTransformer(); });
   
   SQLite::Connection Con(Setup);
   Con.OpenNew();
@@ -154,7 +151,7 @@ BOOST_AUTO_TEST_CASE(DeleteQueueTest)
 
   {  
   Test Item;
-  Item.SetId("1");
+  Item.Id = "1";
   Item.SetAmount(10);
   Item.SetValue("Box");
   
@@ -171,7 +168,7 @@ BOOST_AUTO_TEST_CASE(DeleteQueueTest)
 
   {  
   Test Item;
-  Item.SetId("1");
+  Item.Id = "1";
   
   TransformerQueue Queue(&Con);
   Queue.Delete(Item);
@@ -190,7 +187,7 @@ BOOST_AUTO_TEST_CASE(LoadFromTransformerTest)
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";
   
-  TransformerRegistry::Register(Test::TypeId_, []() { return (TransformerBase*)new TestTransformer(); });
+  TransformerRegistry::Register(Test::ice_staticId(), []() { return (TransformerBase*)new TestTransformer(); });
   
   SQLite::Connection Con(Setup);
   Con.OpenNew();
@@ -202,7 +199,7 @@ BOOST_AUTO_TEST_CASE(LoadFromTransformerTest)
 
   {  
   Test Item;
-  Item.SetId("1");
+  Item.Id = "1";
   Item.SetAmount(10);
   Item.SetValue("Box");
   
@@ -212,9 +209,9 @@ BOOST_AUTO_TEST_CASE(LoadFromTransformerTest)
   }
 
   {  
-  unique_ptr<TransformerBase> Transformer(TransformerRegistry::Fetch(Test::TypeId_));
+  unique_ptr<TransformerBase> Transformer(TransformerRegistry::Fetch(Test::ice_staticId()));
   Test Item;
-  Item.SetId("1");
+  Item.Id = "1";
   Transformer->Connect(&Con);
   BOOST_CHECK(Transformer->Load(Item));
   BOOST_CHECK(Item.Amount() == 10);

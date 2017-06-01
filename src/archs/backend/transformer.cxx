@@ -1,13 +1,13 @@
 #include <sstream>
 #include <boost/format.hpp>
 #include "transformer.hxx"
+#include "Common.h"
 
 using namespace std;
 using namespace boost;
 using namespace Archive::Backend;
 
 unordered_map<string, TransformerFactory> TransformerRegistry::Transformers_;
-const string Persistable::TypeId_ = "Persistable";
 
 string TransformerBase::StandardInsert() const
 {
@@ -74,31 +74,31 @@ string TransformerBase::StandardSelect() const
     return Buffer.str();
 }
 
-void TransformerBase::Delete(const Persistable& item)
+void TransformerBase::Delete(const Common::Persistable& item)
 {
     if (DeleteCommand_ == false) DeleteCommand_ = Connection_->CreateFree(Deleter());
     ToDelete(item);
     DeleteCommand_->Execute();
 }
 
-void TransformerBase::Insert(const Persistable& item)
+void TransformerBase::Insert(const Common::Persistable& item)
 {
     if (InsertCommand_ == false) InsertCommand_ = Connection_->CreateFree(Inserter());
     ToInsert(item);
     InsertCommand_->Execute();
 }
 
-void TransformerBase::Update(const Persistable& item)
+void TransformerBase::Update(const Common::Persistable& item)
 {
     if (UpdateCommand_ == false) UpdateCommand_ = Connection_->CreateFree(Updater());
     ToUpdate(item);
     UpdateCommand_->Execute();
 }
 
-bool TransformerBase::Load(Persistable& item)
+bool TransformerBase::Load(Common::Persistable& item)
 {
     if (SelectCommand_ == false) SelectCommand_ = Connection_->CreateFree(Selector());
-    SelectCommand_->Parameters()["id"].SetValue(item.Id());
+    SelectCommand_->Parameters()["id"].SetValue(item.Id);
     auto& Result = SelectCommand_->Open();
     if (Result.HasData()) FromData(*Result.begin(), item);
     return Result.HasData();
@@ -127,6 +127,11 @@ void TransformerBase::Reset()
     SelectCommand_.reset();
 }
 
+void TransformerBase::ToDelete(const Common::Persistable& item) const
+{
+    DeleteCommand_->Parameters()["id"].SetValue(item.Id);
+};
+
 TransformerQueue::TransformerQueue(SQLite::Connection* connection)
 : Connection_(connection)
 { }
@@ -137,7 +142,7 @@ void TransformerQueue::Flush()
     unordered_map<string, unique_ptr<TransformerBase>> Cache;
     
     for (auto& Delete : Deletes_) {
-        auto Key = Delete->TypeId();
+        auto Key = Delete->ice_id();
         if (Cache.find(Key) == Cache.end()) {
             Cache.insert({ Key, unique_ptr<TransformerBase>(TransformerRegistry::Fetch(Key)) });
             Cache[Key]->Connect(Connection_);
@@ -146,7 +151,7 @@ void TransformerQueue::Flush()
     }
     
     for (auto& Insert : Inserts_) {
-        auto Key = Insert->TypeId();
+        auto Key = Insert->ice_id();
         if (Cache.find(Key) == Cache.end()) {
             Cache.insert({ Key, unique_ptr<TransformerBase>(TransformerRegistry::Fetch(Key)) });
             Cache[Key]->Connect(Connection_);
@@ -155,7 +160,7 @@ void TransformerQueue::Flush()
     }
     
     for (auto& Update : Updates_) {
-        auto Key = Update->TypeId();
+        auto Key = Update->ice_id();
         if (Cache.find(Key) == Cache.end()) {
             Cache.insert({ Key, unique_ptr<TransformerBase>(TransformerRegistry::Fetch(Key)) });
             Cache[Key]->Connect(Connection_);

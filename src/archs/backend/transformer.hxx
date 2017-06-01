@@ -9,24 +9,17 @@
 #include <unordered_map>
 #include <vector>
 #include "sqlite.hxx"
+//#include "Common.h"
+
+namespace Common
+{
+    class Persistable;
+}
 
 namespace Archive
 {
 namespace Backend
 {
-
-class Persistable
-{
-protected:
-    std::string Id_;
-    
-public:
-    static const std::string TypeId_;
-    
-    virtual const std:: string& TypeId() const { return TypeId_; }
-    const std::string& Id() const { return Id_; }
-    void SetId(const std::string& value) { Id_ = value; }
-};
 
 class TransformerBase
 {
@@ -48,22 +41,21 @@ protected:
     virtual std::string Updater() const { return StandardUpdate(); }
     virtual std::string Deleter() const { return StandardDelete(); }
     virtual std::string Selector() const { return StandardSelect(); }
-    virtual void ToInsert(const Persistable& item) const = 0;
-    virtual void ToUpdate(const Persistable& item) const = 0;
-    virtual void ToDelete(const Persistable& item) const = 0;
-    virtual void FromData(const SQLite::ResultRow& data, Persistable& item) const = 0;
+    virtual void ToInsert(const Common::Persistable& item) const = 0;
+    virtual void ToUpdate(const Common::Persistable& item) const = 0;
+    virtual void ToDelete(const Common::Persistable& item) const;
+    virtual void FromData(const SQLite::ResultRow& data, Common::Persistable& item) const = 0;
     virtual std::string TableName() const = 0;
     virtual std::vector<std::string> Fields() const { return { "id" }; }
 
 public:
-    void Delete(const Persistable& item);
-    void Insert(const Persistable& item);
-    void Update(const Persistable& item);
-    bool Load(Persistable& item);
+    void Delete(const Common::Persistable& item);
+    void Insert(const Common::Persistable& item);
+    void Update(const Common::Persistable& item);
+    bool Load(Common::Persistable& item);
     void Connect(const SQLite::Connection* connection);
 
 public:
-    virtual const std::type_info& PersistingType() const = 0;
     void Reset();
 };
 
@@ -74,40 +66,33 @@ protected:
     virtual void Serialize(const SQLite::ParameterSet& target, const T& item) const = 0;
     virtual void Materialize(const SQLite::ResultRow& data, T& item) const = 0;
     
-    void ToInsert(const Persistable& item) const override { Serialize(InsertCommand_->Parameters(), (const T&) item); }
-    void ToUpdate(const Persistable& item) const override { Serialize(UpdateCommand_->Parameters(), (const T&) item); }
-    void ToDelete(const Persistable& item) const override { DeleteCommand_->Parameters()["id"].SetValue(item.Id()); }
-    void FromData(const SQLite::ResultRow& data, Persistable& item) const override { Materialize(data, (T&) item); }
-    
-public:
-    const std::type_info& PersistingType() const
-    {
-        return typeid(T);
-    }
+    void ToInsert(const Common::Persistable& item) const override { Serialize(InsertCommand_->Parameters(), (const T&) item); }
+    void ToUpdate(const Common::Persistable& item) const override { Serialize(UpdateCommand_->Parameters(), (const T&) item); }
+    void FromData(const SQLite::ResultRow& data, Common::Persistable& item) const override { Materialize(data, (T&) item); }
 };
 
 class TransformerQueue
 {
 private:
     SQLite::Connection* Connection_;
-    std::vector<const Persistable*> Deletes_;
-    std::vector<const Persistable*> Updates_;
-    std::vector<const Persistable*> Inserts_;
+    std::vector<const Common::Persistable*> Deletes_;
+    std::vector<const Common::Persistable*> Updates_;
+    std::vector<const Common::Persistable*> Inserts_;
 
 public:
     TransformerQueue(SQLite::Connection* Connection_);
     
-    void Insert(const Persistable& item)
+    void Insert(const Common::Persistable& item)
     {
         Inserts_.push_back(&item);
     }
 
-    void Update(const Persistable& item)
+    void Update(const Common::Persistable& item)
     {
         Updates_.push_back(&item);
     }
 
-    void Delete(const Persistable& item)
+    void Delete(const Common::Persistable& item)
     {
         Deletes_.push_back(&item);
     }

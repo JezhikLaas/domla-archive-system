@@ -1,4 +1,7 @@
 #include "document_storage.hxx"
+#include "document_schema.hxx"
+#include "transformer.hxx"
+#include "Archive.h"
 #include <math.h>
 #include <boost/filesystem.hpp>
 
@@ -25,6 +28,10 @@ void DocumentStorage::InitializeBuckets()
 
 void DocumentStorage::RegisterTransformers()
 {
+    TransformerRegistry::Register(Access::DocumentData::ice_staticId(), []() { return (TransformerBase*)new DocumentTransformer(); });    
+    TransformerRegistry::Register(Access::DocumentHistoryEntry::ice_staticId(), []() { return (TransformerBase*)new HistoryTransformer(); });    
+    TransformerRegistry::Register(Access::DocumentContent::ice_staticId(), []() { return (TransformerBase*)new ContentTransformer(); });    
+    TransformerRegistry::Register(Access::DocumentAssignment::ice_staticId(), []() { return (TransformerBase*)new AssignmentTransformer(); });    
 }
 
 void DocumentStorage::Bucketing(int count, std::function<shared_ptr<DataBucket>(int)> generator, shared_ptr<DataBucket> buckets[])
