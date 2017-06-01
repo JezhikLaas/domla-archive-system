@@ -8,7 +8,7 @@
 
 using namespace Archive::Backend::SQLite;
 
-BOOST_AUTO_TEST_CASE(OpenConnectionInMemory)
+BOOST_AUTO_TEST_CASE(Open_Connection_In_Memory)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -19,7 +19,7 @@ BOOST_AUTO_TEST_CASE(OpenConnectionInMemory)
   BOOST_CHECK(Target.IsOpen());
 }
 
-BOOST_AUTO_TEST_CASE(TablesCanBeCreatedInMemory)
+BOOST_AUTO_TEST_CASE(Tables_Can_Be_Created_In_Memory)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE(TablesCanBeCreatedInMemory)
   Target.Execute();
 }
 
-BOOST_AUTO_TEST_CASE(ErrorsAreProperlyReported)
+BOOST_AUTO_TEST_CASE(Errors_Are_Properly_Reported)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(ErrorsAreProperlyReported)
   BOOST_CHECK(Reported);
 }
 
-BOOST_AUTO_TEST_CASE(ExecuteScalarWorks)
+BOOST_AUTO_TEST_CASE(Execute_Scalar_Works)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE(ExecuteScalarWorks)
   BOOST_CHECK(Result == 2);
 }
 
-BOOST_AUTO_TEST_CASE(ParametersDetected)
+BOOST_AUTO_TEST_CASE(Parameters_Detected)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(ParametersDetected)
   BOOST_CHECK(Count == 2);
 }
 
-BOOST_AUTO_TEST_CASE(ParametersAccessibleByName)
+BOOST_AUTO_TEST_CASE(Parameters_Accessible_By_Name)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -111,7 +111,7 @@ BOOST_AUTO_TEST_CASE(ParametersAccessibleByName)
   }
 }
 
-BOOST_AUTO_TEST_CASE(ParametersNameAccessCaseInsensitive)
+BOOST_AUTO_TEST_CASE(Parameters_Name_Access_Case_Insensitive)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE(ParametersNameAccessCaseInsensitive)
   }
 }
 
-BOOST_AUTO_TEST_CASE(InsertingValuesIntoMemory)
+BOOST_AUTO_TEST_CASE(Inserting_Values_Into_Memory)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE(InsertingValuesIntoMemory)
   }
 }
 
-BOOST_AUTO_TEST_CASE(OpeningResultSet)
+BOOST_AUTO_TEST_CASE(Opening_Result_Set)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE(OpeningResultSet)
   }
 }
 
-BOOST_AUTO_TEST_CASE(CountingRowsInResultSet)
+BOOST_AUTO_TEST_CASE(Counting_Rows_In_Result_Set)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE(CountingRowsInResultSet)
   BOOST_CHECK(Rows == 1);
 }
 
-BOOST_AUTO_TEST_CASE(ReadValuesFromResultRow)
+BOOST_AUTO_TEST_CASE(Read_Values_From_Result_Row)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -253,7 +253,7 @@ BOOST_AUTO_TEST_CASE(ReadValuesFromResultRow)
   BOOST_CHECK(Two == 2);
 }
 
-BOOST_AUTO_TEST_CASE(WriteAndReadBinaryData)
+BOOST_AUTO_TEST_CASE(Write_And_Read_Binary_Data)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -287,7 +287,7 @@ BOOST_AUTO_TEST_CASE(WriteAndReadBinaryData)
   BOOST_CHECK(std::equal(Buffer.begin(), Buffer.end(), Check.begin(), Check.end()));
 }
 
-BOOST_AUTO_TEST_CASE(WriteAndReadText)
+BOOST_AUTO_TEST_CASE(Write_And_Read_Text)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -321,7 +321,7 @@ BOOST_AUTO_TEST_CASE(WriteAndReadText)
   BOOST_CHECK(Check == "MyTestValue");
 }
 
-BOOST_AUTO_TEST_CASE(WriteAndReadTextFromCharacterPointer)
+BOOST_AUTO_TEST_CASE(Write_And_Read_Text_From_Character_Pointer)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -354,7 +354,7 @@ BOOST_AUTO_TEST_CASE(WriteAndReadTextFromCharacterPointer)
   BOOST_CHECK(Check == "MyTestValue");
 }
 
-BOOST_AUTO_TEST_CASE(WriteAndReadBinaryDataFromPointer)
+BOOST_AUTO_TEST_CASE(Write_And_Read_Binary_Data_From_Pointer)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -395,7 +395,7 @@ BOOST_AUTO_TEST_CASE(WriteAndReadBinaryDataFromPointer)
   BOOST_CHECK(Check[6] == 1);
 }
 
-BOOST_AUTO_TEST_CASE(RollbackRevertsChanges)
+BOOST_AUTO_TEST_CASE(Rollback_Reverts_Changes)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -430,7 +430,7 @@ BOOST_AUTO_TEST_CASE(RollbackRevertsChanges)
   }
 }
 
-BOOST_AUTO_TEST_CASE(CommitWritesChanges)
+BOOST_AUTO_TEST_CASE(Commit_Writes_Changes)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -465,7 +465,7 @@ BOOST_AUTO_TEST_CASE(CommitWritesChanges)
   }
 }
 
-BOOST_AUTO_TEST_CASE(ScopedRollbackRevertsChanges)
+BOOST_AUTO_TEST_CASE(Scoped_Rollback_Reverts_Changes)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -499,7 +499,7 @@ BOOST_AUTO_TEST_CASE(ScopedRollbackRevertsChanges)
   }
 }
 
-BOOST_AUTO_TEST_CASE(ReusingPreparedStatement)
+BOOST_AUTO_TEST_CASE(Reusing_Prepared_Statement)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -534,7 +534,7 @@ BOOST_AUTO_TEST_CASE(ReusingPreparedStatement)
   BOOST_CHECK(Rows == 2);
 }
 
-BOOST_AUTO_TEST_CASE(CreateFreeCommand)
+BOOST_AUTO_TEST_CASE(Create_Free_Command)
 {
   Configuration Setup;
   Setup.Path = ":memory:";
@@ -546,7 +546,7 @@ BOOST_AUTO_TEST_CASE(CreateFreeCommand)
   Target->Execute();
 }
 
-BOOST_AUTO_TEST_CASE(NonDefaultConfiguration)
+BOOST_AUTO_TEST_CASE(Non_Default_Configuration)
 {
   Configuration Setup;
   Setup.Path = "";

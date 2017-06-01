@@ -30,7 +30,7 @@ public:
     int Backends() const override { return 10; }
 };
 
-BOOST_AUTO_TEST_CASE(StorageCreatesRequestedBucketsTest)
+BOOST_AUTO_TEST_CASE(Storage_Creates_Requested_Buckets_Test)
 {
     Provider Settings;
     auto& Storage = DocumentStorage(Settings);

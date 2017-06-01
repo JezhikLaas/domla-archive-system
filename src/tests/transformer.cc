@@ -55,7 +55,7 @@ protected:
     }
 };
 
-BOOST_AUTO_TEST_CASE(InsertQueueTest)
+BOOST_AUTO_TEST_CASE(Insert_Queue_Test)
 {
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";
@@ -87,7 +87,7 @@ BOOST_AUTO_TEST_CASE(InsertQueueTest)
   }
 }
 
-BOOST_AUTO_TEST_CASE(UpdateQueueTest)
+BOOST_AUTO_TEST_CASE(Update_Queue_Test)
 {
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";
@@ -134,7 +134,7 @@ BOOST_AUTO_TEST_CASE(UpdateQueueTest)
   }
 }
 
-BOOST_AUTO_TEST_CASE(DeleteQueueTest)
+BOOST_AUTO_TEST_CASE(Delete_Queue_Test)
 {
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(DeleteQueueTest)
   }
 }
 
-BOOST_AUTO_TEST_CASE(LoadFromTransformerTest)
+BOOST_AUTO_TEST_CASE(Load_From_Transformer_Test)
 {
   SQLite::Configuration Setup;
   Setup.Path = ":memory:";

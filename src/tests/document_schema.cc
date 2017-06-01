@@ -40,7 +40,7 @@ public:
     }
 };
 
-BOOST_AUTO_TEST_CASE(DataBucketTest)
+BOOST_AUTO_TEST_CASE(Data_Bucket_Test)
 {
     Provider Test;
     DataBucket Bucket(1, Test);
