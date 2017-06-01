@@ -6,22 +6,29 @@
 #include <vector>
 #include "data_bucket.hxx"
 #include "settings_provider.hxx"
+#include "Archive.h"
 
 namespace Archive
 {
 namespace Backend
 {
 
+using BucketHandle = std::shared_ptr<DataBucket>;
+using CreateHandle = std::function<BucketHandle(int)>;
+
 class DocumentStorage
 {
 private:
-    std::shared_ptr<DataBucket> Buckets_[256];
+    BucketHandle Buckets_[256];
     const SettingsProvider& Settings_;
+    std::vector<BucketHandle> DistinctHandles_;
 
 private:
     void InitializeBuckets();
     void RegisterTransformers();
-    void Bucketing(int count, std::function<std::shared_ptr<DataBucket>(int)> generator, std::shared_ptr<DataBucket>buckets[]);
+    void Bucketing(int count, CreateHandle generator, BucketHandle buckets[]);
+    void BuildFolderTree();
+    std::vector<Access::FolderInfo> ReadBranches(const std::string& startWith);
     
 public:
     DocumentStorage(const SettingsProvider& settings);

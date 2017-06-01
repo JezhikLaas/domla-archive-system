@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 #include "sqlite.hxx"
-//#include "Common.h"
+#include "Common.h"
 
 namespace Common
 {
