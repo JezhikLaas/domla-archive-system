@@ -59,6 +59,7 @@ add_library(
     src/archs/backend/document_schema.cxx
     src/archs/backend/document_storage.cxx
     src/archs/backend/transformer.cxx
+    src/archs/backend/virtual_tree.cxx
 )
 
 add_executable(

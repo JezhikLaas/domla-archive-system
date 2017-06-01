@@ -6,6 +6,7 @@
 #include <vector>
 #include "data_bucket.hxx"
 #include "settings_provider.hxx"
+#include "virtual_tree.hxx"
 #include "Archive.h"
 
 namespace Archive
@@ -22,6 +23,7 @@ private:
     BucketHandle Buckets_[256];
     const SettingsProvider& Settings_;
     std::vector<BucketHandle> DistinctHandles_;
+    VirtualTree Folders_;
 
 private:
     void InitializeBuckets();

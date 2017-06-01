@@ -65,6 +65,7 @@ void DocumentStorage::Bucketing(int count, CreateHandle generator, BucketHandle 
 
 void DocumentStorage::BuildFolderTree()
 {
+    Folders_.Load(ReadBranches(""));
 }
 
 vector<Access::FolderInfo> DocumentStorage::ReadBranches(const string& startWith)
