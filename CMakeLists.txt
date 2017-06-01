@@ -25,6 +25,7 @@ add_library(
     src/lib/Archive.cpp
     src/lib/Authentication.cpp
     src/lib/Administrator.cpp
+    src/lib/utils.cxx
 )
 
 add_executable(

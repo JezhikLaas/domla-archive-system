@@ -1,8 +1,9 @@
+#include "utils.hxx"
 #include "virtual_tree.hxx"
 #include <algorithm>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/Split.hpp>
 
 using namespace std;
 using namespace Archive::Backend;
@@ -54,7 +55,7 @@ void VirtualTree::Load(const vector<Access::FolderInfo>& entries)
 {
     LockType Lock(SyncRoot_);
     for (auto& Entry : entries) {
-        auto Parts = Split(Entry.Name);
+        auto Parts = Utils::Split(Entry.Name);
         auto Cursor = &Root_;
         
         for (vector<string>::size_type Index = 0; Index < Parts.size(); ++Index) {
@@ -70,7 +71,7 @@ void VirtualTree::Load(const vector<Access::FolderInfo>& entries)
 
 void VirtualTree::Add(const string& path)
 {
-    auto Parts = Split(path);
+    auto Parts = Utils::Split(path);
     LockType Lock(SyncRoot_);
     auto Cursor = &Root_;
 
@@ -86,7 +87,7 @@ void VirtualTree::Add(const string& path)
 
 void VirtualTree::AddUncounted(const string& path)
 {
-    auto Parts = Split(path);
+    auto Parts = Utils::Split(path);
     LockType Lock(SyncRoot_);
     auto Cursor = &Root_;
 
@@ -103,7 +104,7 @@ void VirtualTree::AddUncounted(const string& path)
 
 vector<FolderInfo> VirtualTree::Content(const string& path) const
 {
-    auto Parts = Split(path);
+    auto Parts = Utils::Split(path);
     LockType Lock(SyncRoot_);
     auto Cursor = &Root_;
     
@@ -127,7 +128,7 @@ vector<FolderInfo> VirtualTree::Content(const string& path) const
 
 void VirtualTree::Remove(const string& path)
 {
-    auto Parts = Split(path);
+    auto Parts = Utils::Split(path);
     LockType Lock(SyncRoot_);
     auto Cursor = &Root_;
     
@@ -144,7 +145,7 @@ void VirtualTree::Remove(const string& path)
 
 void VirtualTree::RemoveUncounted(const string& path)
 {
-    auto Parts = Split(path);
+    auto Parts = Utils::Split(path);
     LockType Lock(SyncRoot_);
     auto Cursor = &Root_;
     
@@ -157,14 +158,4 @@ void VirtualTree::RemoveUncounted(const string& path)
         auto Name = Cursor->Name_;
         Cursor->Parent_->RemoveNode(Name);
     }
-}
-
-vector<string> VirtualTree::Split(const string& path) const
-{
-    vector<string> Source;
-    vector<string> Parts;
-    split(Source, path, [](string::value_type item) { return item == '/'; }, boost::token_compress_on);
-    copy_if(Source.cbegin(), Source.cend(), back_inserter(Parts), [](const string& item) { return item.empty() == false; });
-    
-    return Parts;
 }

@@ -68,7 +68,6 @@ class VirtualTree
 private:
     VirtualFolder Root_;
     mutable std::recursive_mutex SyncRoot_;
-    std::vector<std::string> Split(const std::string& path) const;
 
 public:
     VirtualTree()
