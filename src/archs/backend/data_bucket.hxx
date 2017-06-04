@@ -24,6 +24,8 @@ public:
 
     const SQLite::Connection& Reader() const { return *Read; }
     const SQLite::Connection& Writer() const { return *Write; }
+    SQLite::Connection* Reading() const { return Read.get(); }
+    SQLite::Connection* Writing() const { return Write.get(); }
     std::recursive_mutex ReadGuard;
     std::recursive_mutex WriteGuard;
 };

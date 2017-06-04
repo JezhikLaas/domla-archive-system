@@ -10,11 +10,17 @@ using namespace Archive::Backend;
 
 DataBucket::DataBucket(int id, const SettingsProvider& settings)
 {
-    auto Location = path(path(settings.DataLocation()) / (format("%03ddomla.archive") % id).str());
+    auto Location = settings.DataLocation() != ":memory:"
+                    ?
+                    path(path(settings.DataLocation()) / (format("%03ddomla.archive") % id).str()).string()
+                    :
+                    settings.DataLocation()
+                    ;
+                    
     SQLite::Configuration Setup;
     Setup.BusyTimeout = 100;
     Setup.CacheSize = -20000;
-    Setup.Path = Location.string();
+    Setup.Path = Location;
     Setup.ForeignKeys = true;
     Setup.Journal = SQLite::Configuration::JournalMode::Wal;
     Setup.PageSize = 65536;

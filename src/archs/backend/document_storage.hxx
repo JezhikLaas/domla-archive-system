@@ -31,12 +31,22 @@ private:
     void Bucketing(int count, CreateHandle generator, BucketHandle buckets[]);
     void BuildFolderTree();
     std::vector<Access::FolderInfo> ReadBranches(const std::string& startWith);
+    BucketHandle FetchBucket(const std::string& value) const;
+    void ReadOnlyDenied(const std::string& user) const;
+    void InsertIntoDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& comment);
+    void UpdateInDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment);
+    Access::DocumentDataPtr Fetch(BucketHandle handle, const std::string& id) const;
     
 public:
     DocumentStorage(const SettingsProvider& settings);
     ~DocumentStorage();
     DocumentStorage(const DocumentStorage&) = delete;
     void operator= (const DocumentStorage&) = delete;
+
+public:
+    Access::DocumentDataPtr Load(const std::string& id, const std::string& user) const;
+    void Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment = "");
+    void Lock(const std::string& id, const std::string& user) const;
 };
 
 } // Backend

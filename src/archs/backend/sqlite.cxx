@@ -211,7 +211,7 @@ struct Connection::Implementation
                      SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE;
                      
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle, Flags, nullptr), Handle);
-        ApplySetup();
+        if (Setup.ReadOnly == false) ApplySetup();
     }
     
     void Create()
@@ -296,6 +296,9 @@ struct Command::Implementation
             }
             else if (Item.Value().type() == typeid(int)) {
                 sqlite3_bind_int(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), boost::any_cast<int>(Item.Value_));
+            }
+            else if (Item.Value().type() == typeid(int64_t)) {
+                sqlite3_bind_int64(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), boost::any_cast<int64_t>(Item.Value_));
             }
             else if (Item.Value().type() == typeid(double)) {
                 sqlite3_bind_double(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), boost::any_cast<double>(Item.Value_));
@@ -398,9 +401,21 @@ int ResultRow::Get(const std::string& name) const
 }
 
 template <>
+int64_t ResultRow::Get(const std::string& name) const
+{
+    return sqlite3_column_int64(Owner_.Inner->Handle, ColumnIndex(name));
+}
+
+template <>
 int ResultRow::Get(int index) const
 {
     return sqlite3_column_int(Owner_.Inner->Handle, index);
+}
+
+template <>
+int64_t ResultRow::Get(int index) const
+{
+    return sqlite3_column_int64(Owner_.Inner->Handle, index);
 }
 
 template <>

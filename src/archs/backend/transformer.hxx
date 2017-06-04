@@ -69,6 +69,13 @@ protected:
     void ToInsert(const Common::Persistable& item) const override { Serialize(InsertCommand_->Parameters(), (const T&) item); }
     void ToUpdate(const Common::Persistable& item) const override { Serialize(UpdateCommand_->Parameters(), (const T&) item); }
     void FromData(const SQLite::ResultRow& data, Common::Persistable& item) const override { Materialize(data, (T&) item); }
+
+public:
+    Transformer() { }
+    Transformer(const SQLite::Connection* connection)
+    {
+        Connect(connection);
+    }
 };
 
 class TransformerQueue

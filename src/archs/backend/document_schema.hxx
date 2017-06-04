@@ -16,7 +16,7 @@ public:
     static void Ensure(const SQLite::Connection& connection);
 };
 
-class DocumentTransformer : Transformer<Access::DocumentData>
+class DocumentTransformer : public Transformer<Access::DocumentData>
 {
 protected:
     std::string TableName() const override
@@ -41,7 +41,7 @@ protected:
     void Materialize(const SQLite::ResultRow& data, Access::DocumentData& item) const override
     {
         item.Creator = data.Get<std::string>("Creator");
-        item.Created = data.Get<int>("Created");
+        item.Created = data.Get<std::int64_t>("Created");
         item.Name = data.Get<std::string>("FileName");
         item.Display = data.Get<std::string>("DisplayName");
         item.Deleted = data.Get<int>("State") == 1;
@@ -62,9 +62,16 @@ protected:
         target["Keywords"].SetValue(item.Keywords);
         target["Size"].SetValue(item.Size);
     }
+
+public:
+    DocumentTransformer() { }
+    
+    DocumentTransformer(const SQLite::Connection* connection)
+    : Transformer(connection)
+    { }
 };
 
-class HistoryTransformer : Transformer<Access::DocumentHistoryEntry>
+class HistoryTransformer : public Transformer<Access::DocumentHistoryEntry>
 {
 protected:
     std::string TableName() const override
@@ -90,7 +97,7 @@ protected:
     {
         item.Document = data.Get<std::string>("Owner");
         item.Revision = data.Get<int>("SeqId");
-        item.Created = data.Get<int>("Created");
+        item.Created = data.Get<std::int64_t>("Created");
         item.Action = data.Get<std::string>("Action");
         item.Actor = data.Get<std::string>("Actor");
         item.Comment = data.Get<std::string>("Comment");
@@ -112,12 +119,12 @@ protected:
     }
 };
 
-class AssignmentTransformer : Transformer<Access::DocumentAssignment>
+class AssignmentTransformer : public Transformer<Access::DocumentAssignment>
 {
 protected:
     std::string TableName() const override
     {
-        return "DocumentHistories";
+        return "DocumentAssignments";
     }
     
     std::vector<std::string> Fields() const override
@@ -151,12 +158,12 @@ protected:
     }
 };
 
-class ContentTransformer : Transformer<Access::DocumentContent>
+class ContentTransformer : public Transformer<Access::DocumentContent>
 {
 protected:
     std::string TableName() const override
     {
-        return "DocumentHistories";
+        return "DocumentContents";
     }
     
     std::vector<std::string> Fields() const override
