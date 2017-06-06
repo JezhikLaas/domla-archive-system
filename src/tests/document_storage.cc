@@ -155,3 +155,20 @@ BOOST_AUTO_TEST_CASE(Unlock_Document)
 
     BOOST_CHECK(Header->Locker.empty());
 }
+
+BOOST_AUTO_TEST_CASE(Find_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    
+    Storage.Save(Header, Content, "willi");
+    
+    auto Check = Header = Storage.Find("/one", "test.xxx");
+
+    BOOST_CHECK(Check->Id.empty() == false);
+}

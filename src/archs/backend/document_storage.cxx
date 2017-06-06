@@ -33,6 +33,26 @@ string AliasFields(const vector<string>& fields, const string alias)
     return join(Result, ", ");
 }
 
+void FillHeaderFromRow(Access::DocumentDataPtr& target, const SQLite::ResultRow& source)
+{
+    target->Id = source.Get<string>(0);
+    target->User = "";
+    target->Name = source.Get<string>(3);
+    target->Display = source.Get<string>(4);
+    target->Keywords = source.Get<string>(7);
+    target->Locker = source.Get<string>(6);
+    target->Creator = source.Get<string>(1);
+    target->Created = source.Get<int64_t>(2);
+    target->Modified = source.Get<int64_t>(13);
+    target->Size = source.Get<int>(8);
+    target->AssociatedItem = source.Get<string>(10);
+    target->AssociatedClass = source.Get<string>(9);
+    target->Checksum = "";
+    target->FolderPath = source.Get<string>(11);
+    target->Deleted = false;
+    target->Revision = source.Get<int>(12);
+}
+
 } // anonymous namespace
 
 using Guard = lock_guard<recursive_mutex>;
@@ -57,7 +77,7 @@ Access::DocumentDataPtr DocumentStorage::Load(const string& id, const string& us
     return Fetch(Handle, id);
 }
 
-Access::DocumentDataPtr DocumentStorage::FindById(const string& id, int number)
+Access::DocumentDataPtr DocumentStorage::FindById(const string& id, int number) const
 {
     const string QueryTemplate =
 R"(SELECT
@@ -96,32 +116,66 @@ AND
     
     Guard Lock(Handle->ReadGuard);
     
-    auto Result = new Access::DocumentData();
+    Access::DocumentDataPtr Result = new Access::DocumentData();
     auto& Command = Handle->Reader().Create(Query);
     auto& Data = Command.Open();
     
     if (Data.HasData()) {
         auto& Row = Data.begin();
-        
-        Result->Id = Row->Get<string>(0);
-        Result->User = "";
-        Result->Name = Row->Get<string>(3);
-        Result->Display = Row->Get<string>(4);
-        Result->Keywords = Row->Get<string>(7);
-        Result->Locker = Row->Get<string>(6);
-        Result->Creator = Row->Get<string>(1);
-        Result->Created = Row->Get<int64_t>(2);
-        Result->Modified = Row->Get<int64_t>(13);
-        Result->Size = Row->Get<int>(8);
-        Result->AssociatedItem = Row->Get<string>(10);
-        Result->AssociatedClass = Row->Get<string>(9);
-        Result->Checksum = "";
-        Result->FolderPath = Row->Get<string>(11);
-        Result->Deleted = false;
-        Result->Revision = Row->Get<int>(12);
+        FillHeaderFromRow(Result, *Row);
     }
 
     return Result;
+}
+
+Access::DocumentDataPtr DocumentStorage::Find(const std::string& folderPath, const std::string& fileName) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+WHERE
+    asg.Path = '%1%' AND doc.FileName = '%2%' AND doc.State = 0
+)";
+    
+    auto Query = (format(QueryTemplate) % folderPath % fileName).str();
+    vector<future<Access::DocumentDataPtr>> Intermediate;
+    vector<Access::DocumentDataPtr> Result;
+    
+    for (auto& Handle : DistinctHandles_) {
+        Intermediate.push_back(
+            async(
+                [&Handle, &Query]() {
+                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
+                    auto& Command = Handle->Reader().Create(Query);
+                    Access::DocumentDataPtr Item;
+                    for (auto& Row : Command.Open()) {
+                        Item = new Access::DocumentData();
+                        FillHeaderFromRow(Item, Row);
+                        break;
+                    }
+                    
+                    return Item;
+                }
+            )
+        );
+    }
+    
+    for (auto& Found : Intermediate) {
+        auto Item = Found.get();
+        if (Item->Id.empty()) continue;
+        
+        Result.push_back(Item);
+    }
+    
+    return Result.empty() ? new Access::DocumentData() : Result[0].get();
 }
 
 void DocumentStorage::Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)

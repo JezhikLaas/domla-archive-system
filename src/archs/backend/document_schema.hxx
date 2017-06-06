@@ -54,7 +54,7 @@ protected:
     void Serialize(const SQLite::ParameterSet& target, const Access::DocumentData& item) const override
     {
         target["Id"].SetValue(item.Id);
-        target["Creator"].SetValue(item.Id);
+        target["Creator"].SetValue(item.Creator);
         target["Created"].SetValue(item.Created);
         target["FileName"].SetValue(item.Name);
         target["DisplayName"].SetValue(item.Display);

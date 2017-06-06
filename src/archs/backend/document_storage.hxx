@@ -50,7 +50,8 @@ public:
     void Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment = "");
     void Lock(const std::string& id, const std::string& user) const;
     void Unlock(const std::string& id, const std::string& user) const;
-    Access::DocumentDataPtr FindById(const std::string& id, int number = 0);
+    Access::DocumentDataPtr FindById(const std::string& id, int number = 0) const;
+    Access::DocumentDataPtr Find(const std::string& folderPath, const std::string& fileName) const;
 };
 
 } // Backend
