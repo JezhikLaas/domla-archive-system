@@ -104,6 +104,12 @@ bool TransformerBase::Load(Common::Persistable& item)
     return Result.HasData();
 }
 
+bool TransformerBase::Load(SQLite::ResultSet& data, Common::Persistable& item)
+{
+    if (data.HasData()) FromData(*data.begin(), item);
+    return data.HasData();
+}
+
 vector<string> TransformerBase::AppendFields(const vector<string>& fields) const
 {
     auto& Result = TransformerBase::Fields();

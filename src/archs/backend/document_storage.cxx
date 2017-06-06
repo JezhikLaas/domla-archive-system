@@ -1,3 +1,4 @@
+#include "binary_data.hxx"
 #include "document_storage.hxx"
 #include "document_schema.hxx"
 #include "transformer.hxx"
@@ -22,6 +23,18 @@ using namespace boost::filesystem;
 using namespace boost::posix_time;
 using namespace boost::gregorian;
 
+namespace
+{
+
+string AliasFields(const vector<string>& fields, const string alias)
+{
+    vector<string> Result;
+    transform(fields.cbegin(), fields.cend(), back_inserter(Result), [&alias](const string& field) { return alias + "." + field; });
+    return join(Result, ", ");
+}
+
+} // anonymous namespace
+
 using Guard = lock_guard<recursive_mutex>;
 
 DocumentStorage::DocumentStorage(const SettingsProvider& settings)
@@ -42,6 +55,73 @@ Access::DocumentDataPtr DocumentStorage::Load(const string& id, const string& us
 {
     auto Handle = FetchBucket(id);
     return Fetch(Handle, id);
+}
+
+Access::DocumentDataPtr DocumentStorage::FindById(const string& id, int number)
+{
+    const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+WHERE
+    doc.Id = '%1%' AND doc.State = 0
+)";
+
+    const string QueryRevisionTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+WHERE
+    doc.Id = '%1%' AND doc.State = 0
+AND
+    hst.SeqId = %2%
+)";
+
+    auto Query = number == 0 ? (format(QueryTemplate) % id).str() : (format(QueryRevisionTemplate) % id % number).str();
+    auto& Handle = FetchBucket(id);
+    
+    Guard Lock(Handle->ReadGuard);
+    
+    auto Result = new Access::DocumentData();
+    auto& Command = Handle->Reader().Create(Query);
+    auto& Data = Command.Open();
+    
+    if (Data.HasData()) {
+        auto& Row = Data.begin();
+        
+        Result->Id = Row->Get<string>(0);
+        Result->User = "";
+        Result->Name = Row->Get<string>(3);
+        Result->Display = Row->Get<string>(4);
+        Result->Keywords = Row->Get<string>(7);
+        Result->Locker = Row->Get<string>(6);
+        Result->Creator = Row->Get<string>(1);
+        Result->Created = Row->Get<int64_t>(2);
+        Result->Modified = Row->Get<int64_t>(13);
+        Result->Size = Row->Get<int>(8);
+        Result->AssociatedItem = Row->Get<string>(10);
+        Result->AssociatedClass = Row->Get<string>(9);
+        Result->Checksum = "";
+        Result->FolderPath = Row->Get<string>(11);
+        Result->Deleted = false;
+        Result->Revision = Row->Get<int>(12);
+    }
+
+    return Result;
 }
 
 void DocumentStorage::Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)
@@ -282,4 +362,98 @@ void DocumentStorage::InsertIntoDatabase(const Access::DocumentDataPtr& document
 
 void DocumentStorage::UpdateInDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)
 {
+    auto Handle = FetchBucket(document->Id);
+    Guard Lock(Handle->WriteGuard);
+    
+    TransformerQueue Queue(Handle->Writing());
+    Access::DocumentDataPtr Item = Fetch(Handle, document->Id);
+    
+    if (Item->Locker.empty() == false && Item->Locker != user) throw Access::LockError((format("document %1% is already locked by %2%") % Item->Display % Item->Locker).str());
+
+    vector<string> Actions;
+
+    if (document->Name != Item->Name) {
+        Actions.push_back(Access::Renamed);
+    }
+    if (document->Display != Item->Display) {
+        Actions.push_back(Access::Retitled);
+    }
+    if (document->Keywords != Item->Keywords) {
+        Actions.push_back(Access::Keywords);
+    }
+    if (data.empty() == false) {
+        Actions.push_back(Access::Revision);
+    }
+    
+    Item->Name = document->Name;
+    Item->Display = document->Display;
+    Item->Keywords = document->Keywords;
+    Item->Size = data.empty() ? Item->Size : data.size();
+    
+    Queue.Update(*Item);
+    
+    Access::DocumentHistoryEntryPtr History = new Access::DocumentHistoryEntry();
+    History->Action = join(Actions, ";");
+    History->Actor = document->Creator;
+    History->Created = Utils::Ticks(microsec_clock::local_time());
+    History->Document = document->Id;
+    History->Id = Utils::NewId();
+    History->Comment = comment;
+    History->Revision = LatestRevision(Handle->Writing(), document->Id) + 1;
+    
+    Queue.Insert(*History);
+    Access::DocumentContentPtr Content;
+    Access::DocumentContentPtr OldData;
+    
+    if (data.empty() == false) {
+        Content = new Access::DocumentContent();
+
+        OldData = LatestContent(Handle->Writing(), document->Id);
+        OldData->Content = BinaryData::CreatePatch(data, OldData->Content);
+
+        Content->Id = Utils::NewId();
+        Content->Content = data;
+        Content->History = History->Id;
+        Content->Revision = OldData->Revision + 1;
+        Queue.Update(*OldData);
+        Queue.Insert(*Content);
+    }
+
+    Queue.Flush();
+}
+
+int DocumentStorage::LatestRevision(SQLite::Connection* connection, const string& id)
+{
+    const string QueryTemplate = "SELECT MAX(SeqId) FROM DocumentHistories WHERE Owner = '%1%'";
+
+    auto Command = connection->Create((format(QueryTemplate) % id).str());
+    return Command.ExecuteScalar<int>();
+}
+
+Access::DocumentContentPtr DocumentStorage::LatestContent(SQLite::Connection* connection, const string& id)
+{
+    const string QueryTemplate =
+R"(SELECT
+    %1%
+FROM
+    DocumentContents cnt
+INNER JOIN
+    DocumentHistories hst
+ON
+    cnt.Owner = hst.Id
+AND
+    hst.SeqId = (SELECT MAX(SeqId) FROM DocumentHistories hin WHERE hin.Owner = hst.Owner AND EXISTS(SELECT 1 FROM DocumentContents nst WHERE nst.Owner = hin.Id))
+WHERE
+    hst.Owner = '%2%'
+AND
+    cnt.Owner = hst.Id)";
+
+    ContentTransformer Transformer;
+    Access::DocumentContentPtr Result = new Access::DocumentContent();
+    auto Fields = AliasFields(ContentTransformer::FieldNames(), "cnt");
+    auto& Command = connection->Create((format(QueryTemplate) % Fields % id).str());
+    auto& Data = Command.Open();
+    if (Transformer.Load(Data, *Result) == false) throw Access::NotFoundError((format("no content for document id %1%") % id).str());
+
+    return Result;
 }

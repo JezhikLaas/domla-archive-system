@@ -36,6 +36,8 @@ private:
     void InsertIntoDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& comment);
     void UpdateInDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment);
     Access::DocumentDataPtr Fetch(BucketHandle handle, const std::string& id) const;
+    int LatestRevision(SQLite::Connection* connection, const std::string& id);
+    Access::DocumentContentPtr LatestContent(SQLite::Connection* connection, const std::string& id);
     
 public:
     DocumentStorage(const SettingsProvider& settings);
@@ -47,6 +49,7 @@ public:
     Access::DocumentDataPtr Load(const std::string& id, const std::string& user) const;
     void Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment = "");
     void Lock(const std::string& id, const std::string& user) const;
+    Access::DocumentDataPtr FindById(const std::string& id, int number = 0);
 };
 
 } // Backend

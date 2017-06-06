@@ -40,6 +40,7 @@ protected:
     
     void Materialize(const SQLite::ResultRow& data, Access::DocumentData& item) const override
     {
+        item.Id = data.Get<std::string>("Id");
         item.Creator = data.Get<std::string>("Creator");
         item.Created = data.Get<std::int64_t>("Created");
         item.Name = data.Get<std::string>("FileName");
@@ -69,6 +70,21 @@ public:
     DocumentTransformer(const SQLite::Connection* connection)
     : Transformer(connection)
     { }
+
+    static std::vector<std::string> FieldNames()
+    {
+        return {
+            "id",
+            "Creator",
+            "Created",
+            "FileName",
+            "DisplayName",
+            "State",
+            "Locker",
+            "Keywords",
+            "Size",
+        };
+    }
 };
 
 class HistoryTransformer : public Transformer<Access::DocumentHistoryEntry>
@@ -95,6 +111,7 @@ protected:
     
     void Materialize(const SQLite::ResultRow& data, Access::DocumentHistoryEntry& item) const override
     {
+        item.Id = data.Get<std::string>("Id");
         item.Document = data.Get<std::string>("Owner");
         item.Revision = data.Get<int>("SeqId");
         item.Created = data.Get<std::int64_t>("Created");
@@ -116,6 +133,22 @@ protected:
         target["Comment"].SetValue(item.Comment);
         target["Source"].SetValue(item.Source);
         target["Target"].SetValue(item.Target);
+    }
+
+public:
+    static std::vector<std::string> FieldNames()
+    {
+        return {
+            "id",
+            "Owner",
+            "SeqId",
+            "Created",
+            "Action",
+            "Actor",
+            "Comment",
+            "Source",
+            "Target",
+        };
     }
 };
 
@@ -140,6 +173,7 @@ protected:
     
     void Materialize(const SQLite::ResultRow& data, Access::DocumentAssignment& item) const override
     {
+        item.Id = data.Get<std::string>("Id");
         item.History = data.Get<std::string>("Owner");
         item.Revision = data.Get<int>("SeqId");
         item.AssignmentType = data.Get<std::string>("AssignmentType");
@@ -156,6 +190,19 @@ protected:
         target["AssignmentType"].SetValue(item.AssignmentId);
         target["Path"].SetValue(item.Path);
     }
+
+public:
+    static std::vector<std::string> FieldNames()
+    {
+        return {
+            "id",
+            "Owner",
+            "SeqId",
+            "AssignmentType",
+            "AssignmentId",
+            "Path",
+        };
+    }
 };
 
 class ContentTransformer : public Transformer<Access::DocumentContent>
@@ -169,7 +216,6 @@ protected:
     std::vector<std::string> Fields() const override
     {
         return AppendFields({
-            "Id",
             "Owner",
             "SeqId",
             "Checksum",
@@ -179,6 +225,7 @@ protected:
     
     void Materialize(const SQLite::ResultRow& data, Access::DocumentContent& item) const override
     {
+        item.Id = data.Get<std::string>("Id");
         item.History = data.Get<std::string>("Owner");
         item.Revision = data.Get<int>("SeqId");
         item.Checksum = data.Get<std::string>("Checksum");
@@ -192,6 +239,18 @@ protected:
         target["SeqId"].SetValue(item.Revision);
         target["Checksum"].SetValue(item.Checksum);
         target["Data"].SetValue(item.Content);
+    }
+
+public:
+    static std::vector<std::string> FieldNames()
+    {
+        return {
+            "id",
+            "Owner",
+            "SeqId",
+            "Checksum",
+            "Data",
+        };
     }
 };
 

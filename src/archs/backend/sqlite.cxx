@@ -421,13 +421,15 @@ int64_t ResultRow::Get(int index) const
 template <>
 string ResultRow::Get(const std::string& name) const
 {
-    return reinterpret_cast<const char*>(sqlite3_column_text(Owner_.Inner->Handle, ColumnIndex(name)));
+	auto data = sqlite3_column_text(Owner_.Inner->Handle, ColumnIndex(name));
+    return data != nullptr ? reinterpret_cast<const char*>(data) : "";
 }
 
 template <>
 string ResultRow::Get(int index) const
 {
-    return reinterpret_cast<const char*>(sqlite3_column_text(Owner_.Inner->Handle, index));
+	auto data = sqlite3_column_text(Owner_.Inner->Handle, index);
+	return data != nullptr ? reinterpret_cast<const char*>(data) : "";
 }
 
 vector<unsigned char> ResultRow::GetBlob(int index) const

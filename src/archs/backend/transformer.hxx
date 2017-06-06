@@ -53,7 +53,9 @@ public:
     void Insert(const Common::Persistable& item);
     void Update(const Common::Persistable& item);
     bool Load(Common::Persistable& item);
+    bool Load(SQLite::ResultSet& data, Common::Persistable& item);
     void Connect(const SQLite::Connection* connection);
+    static std::vector<std::string> FieldNames() { return { "id" }; }
 
 public:
     void Reset();
