@@ -152,6 +152,23 @@ void DocumentStorage::Lock(const std::string& id, const std::string& user) const
     Actions.Flush();
 }
 
+void DocumentStorage::Unlock(const std::string& id, const std::string& user) const
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentDataPtr Document = Fetch(Handle, id);
+    if (Document->Locker.empty()) throw Access::LockError((format("document %1% is not locked") % Document->Display).str());
+    if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is already locked by %2%") % Document->Display % Document->Locker).str());
+    
+    TransformerQueue Actions(Handle->Writing());
+    Document->Locker = "";
+    Actions.Update(*Document);
+    Actions.Flush();
+}
+
 void DocumentStorage::InitializeBuckets()
 {
     if (Settings_.DataLocation() != ":memory:") create_directory(Settings_.DataLocation());

@@ -138,3 +138,20 @@ BOOST_AUTO_TEST_CASE(Update_Saved_Document)
     auto Loaded = Storage.FindById(Header->Id);
     BOOST_CHECK(Loaded->Revision == 2);
 }
+
+BOOST_AUTO_TEST_CASE(Unlock_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Lock(Header->Id, "willi");
+    Storage.Unlock(Header->Id, "willi");
+    
+    Header = Storage.Load(Header->Id, "willi");
+
+    BOOST_CHECK(Header->Locker.empty());
+}

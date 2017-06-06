@@ -49,6 +49,7 @@ public:
     Access::DocumentDataPtr Load(const std::string& id, const std::string& user) const;
     void Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment = "");
     void Lock(const std::string& id, const std::string& user) const;
+    void Unlock(const std::string& id, const std::string& user) const;
     Access::DocumentDataPtr FindById(const std::string& id, int number = 0);
 };
 
