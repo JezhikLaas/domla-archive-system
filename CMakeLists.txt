@@ -6,7 +6,7 @@ enable_testing()
 find_package(Ice)
 find_package(Boost)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/lib ${Ice_INCLUDE_DIR} SYSTEM ${Boost_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/lib ${CMAKE_CURRENT_SOURCE_DIR}/src/archs/backend/bzip2-1.0.5 ${Ice_INCLUDE_DIR} SYSTEM ${Boost_INCLUDE_DIRS})
 file(GLOB TEST_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/tests/*.cc)
 
 add_custom_command(
@@ -54,11 +54,28 @@ target_compile_definitions(
 )
 
 add_library(
+    bzip2lib STATIC
+    src/archs/backend/bzip2-1.0.5/blocksort.c
+    src/archs/backend/bzip2-1.0.5/bzlib.c
+    src/archs/backend/bzip2-1.0.5/compress.c
+    src/archs/backend/bzip2-1.0.5/crctable.c
+    src/archs/backend/bzip2-1.0.5/decompress.c
+    src/archs/backend/bzip2-1.0.5/huffman.c
+    src/archs/backend/bzip2-1.0.5/randtable.c
+)
+
+target_compile_definitions(
+    bzip2lib
+    PUBLIC _CRT_SECURE_NO_WARNINGS
+)
+
+add_library(
     backendlib STATIC
-    src/archs/backend/sqlite.cxx
+    src/archs/backend/binary_data.cxx
     src/archs/backend/data_bucket.cxx
     src/archs/backend/document_schema.cxx
     src/archs/backend/document_storage.cxx
+    src/archs/backend/sqlite.cxx
     src/archs/backend/transformer.cxx
     src/archs/backend/virtual_tree.cxx
 )
@@ -71,6 +88,7 @@ add_executable(
 target_link_libraries(
     archs
     backendlib
+    bzip2lib
     sqlitelib
     archlib
 )
@@ -84,6 +102,7 @@ foreach(testSrc ${TEST_SRCS})
         backendlib
         sqlitelib
         archlib
+        bzip2lib
     )
 
     set_target_properties(
