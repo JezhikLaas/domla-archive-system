@@ -195,7 +195,7 @@ INNER JOIN
 WHERE
     asg.Path = '%1%' AND lower(doc.DisplayName) = lower('%2%') AND doc.State = 0
 )";
-    auto Query = (format(QueryTemplate) % boost::algorithm::to_lower_copy(folderPath) % boost::algorithm::to_lower_copy(displayName)).str();
+    auto Query = (format(QueryTemplate) % algorithm::to_lower_copy(folderPath) % boost::algorithm::to_lower_copy(displayName)).str();
     vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
     
     for (auto& Handle : DistinctHandles_) {
@@ -264,12 +264,66 @@ void DocumentStorage::Unlock(const string& id, const string& user) const
     
     Access::DocumentDataPtr Document = Fetch(Handle, id);
     if (Document->Locker.empty()) throw Access::LockError((format("document %1% is not locked") % Document->Display).str());
-    if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is already locked by %2%") % Document->Display % Document->Locker).str());
+    if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is locked by %2%") % Document->Display % Document->Locker).str());
     
     TransformerQueue Actions(Handle->Writing());
     Document->Locker = "";
     Actions.Update(*Document);
     Actions.Flush();
+}
+
+void DocumentStorage::Move(const string& id, const string& oldPath, const string& newPath, const string& user) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    %1%
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst
+ON
+    asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+WHERE
+    asg.Path = '%2%'
+AND
+    hst.Owner = '%3%'
+)";
+
+    ReadOnlyDenied(user);
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+
+    AssignmentTransformer Transformer;
+    Access::DocumentAssignmentPtr Assignment = new Access::DocumentAssignment();
+    auto Fields = AliasFields(AssignmentTransformer::FieldNames(), "asg");
+    auto& Command = Handle->Writer().Create((format(QueryTemplate) % Fields % algorithm::to_lower_copy(oldPath) % id).str());
+    auto& Data = Command.Open();
+    if (Transformer.Load(Data, *Assignment) == false) throw Access::NotFoundError((format("no assignment for document id %1%") % id).str());
+
+    auto& FolderInfo = async(launch::async, [this, &newPath, &oldPath]() {
+         Folders_.Add(newPath);
+         Folders_.Remove(oldPath);
+    });
+    
+    TransformerQueue Actions(Handle->Writing());
+    
+    Access::DocumentHistoryEntryPtr History = new Access::DocumentHistoryEntry();
+    History->Id = Utils::NewId();
+    History->Action = Access::Moved;
+    History->Actor = user;
+    History->Created = Utils::Ticks(microsec_clock::local_time());
+    History->Document = id;
+    History->Revision = LatestRevision(Handle->Writing(), id) + 1;
+    History->Source = oldPath;
+    History->Target = newPath;
+    Actions.Insert(*History);
+    
+    Assignment->Path = newPath;
+    Actions.Update(*Assignment);
+    
+    Actions.Flush();
+    
+    FolderInfo.wait();
 }
 
 void DocumentStorage::InitializeBuckets()
@@ -542,7 +596,7 @@ void DocumentStorage::UpdateInDatabase(const Access::DocumentDataPtr& document, 
     Queue.Flush();
 }
 
-int DocumentStorage::LatestRevision(SQLite::Connection* connection, const string& id)
+int DocumentStorage::LatestRevision(SQLite::Connection* connection, const string& id) const
 {
     const string QueryTemplate = "SELECT MAX(SeqId) FROM DocumentHistories WHERE Owner = '%1%'";
 
@@ -550,7 +604,7 @@ int DocumentStorage::LatestRevision(SQLite::Connection* connection, const string
     return Command.ExecuteScalar<int>();
 }
 
-Access::DocumentContentPtr DocumentStorage::LatestContent(SQLite::Connection* connection, const string& id)
+Access::DocumentContentPtr DocumentStorage::LatestContent(SQLite::Connection* connection, const string& id) const
 {
     const string QueryTemplate =
 R"(SELECT

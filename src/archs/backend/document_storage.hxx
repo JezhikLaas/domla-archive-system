@@ -23,7 +23,7 @@ private:
     BucketHandle Buckets_[256];
     const SettingsProvider& Settings_;
     std::vector<BucketHandle> DistinctHandles_;
-    VirtualTree Folders_;
+    mutable VirtualTree Folders_;
 
 private:
     void InitializeBuckets();
@@ -36,8 +36,8 @@ private:
     void InsertIntoDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& comment);
     void UpdateInDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment);
     Access::DocumentDataPtr Fetch(BucketHandle handle, const std::string& id) const;
-    int LatestRevision(SQLite::Connection* connection, const std::string& id);
-    Access::DocumentContentPtr LatestContent(SQLite::Connection* connection, const std::string& id);
+    int LatestRevision(SQLite::Connection* connection, const std::string& id) const;
+    Access::DocumentContentPtr LatestContent(SQLite::Connection* connection, const std::string& id) const;
     
 public:
     DocumentStorage(const SettingsProvider& settings);
@@ -53,6 +53,7 @@ public:
     Access::DocumentDataPtr FindById(const std::string& id, int number = 0) const;
     Access::DocumentDataPtr Find(const std::string& folderPath, const std::string& fileName) const;
     std::vector<Access::DocumentDataPtr> FindTitle(const std::string& folderPath, const std::string& displayName) const;
+    void Move(const std::string& id, const std::string& oldPath, const std::string& newPath, const std::string& user) const;
 };
 
 } // Backend
