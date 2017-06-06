@@ -168,7 +168,26 @@ BOOST_AUTO_TEST_CASE(Find_Document)
     
     Storage.Save(Header, Content, "willi");
     
-    auto Check = Header = Storage.Find("/one", "test.xxx");
+    auto Check = Storage.Find("/one", "test.xxx");
 
     BOOST_CHECK(Check->Id.empty() == false);
+}
+
+BOOST_AUTO_TEST_CASE(Find_Document_By_Title)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    Header->Display = "Testing";
+    
+    Storage.Save(Header, Content, "willi");
+    
+    auto Check = Storage.FindTitle("/one", "Testing");
+
+    BOOST_CHECK(Check.empty() == false);
+    BOOST_CHECK(Check[0]->Id.empty() == false);
 }

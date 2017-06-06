@@ -7,6 +7,7 @@
 #include "Authentication.h"
 #include <math.h>
 #include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/date_time/gregorian/gregorian_types.hpp>
@@ -128,7 +129,7 @@ AND
     return Result;
 }
 
-Access::DocumentDataPtr DocumentStorage::Find(const std::string& folderPath, const std::string& fileName) const
+Access::DocumentDataPtr DocumentStorage::Find(const string& folderPath, const string& fileName) const
 {
     const string QueryTemplate =
 R"(SELECT
@@ -145,7 +146,7 @@ WHERE
     asg.Path = '%1%' AND doc.FileName = '%2%' AND doc.State = 0
 )";
     
-    auto Query = (format(QueryTemplate) % folderPath % fileName).str();
+    auto Query = (format(QueryTemplate) % boost::algorithm::to_lower_copy(folderPath) % boost::algorithm::to_lower_copy(fileName)).str();
     vector<future<Access::DocumentDataPtr>> Intermediate;
     vector<Access::DocumentDataPtr> Result;
     
@@ -175,7 +176,55 @@ WHERE
         Result.push_back(Item);
     }
     
-    return Result.empty() ? new Access::DocumentData() : Result[0].get();
+    return Result.empty() ? Access::DocumentDataPtr() : Result[0].get();
+}
+
+vector<Access::DocumentDataPtr> DocumentStorage::FindTitle(const string& folderPath, const string& displayName) const
+{
+            const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+WHERE
+    asg.Path = '%1%' AND lower(doc.DisplayName) = lower('%2%') AND doc.State = 0
+)";
+    auto Query = (format(QueryTemplate) % boost::algorithm::to_lower_copy(folderPath) % boost::algorithm::to_lower_copy(displayName)).str();
+    vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
+    
+    for (auto& Handle : DistinctHandles_) {
+        Intermediates.push_back(
+            async(
+                [&Handle, &Query]() {
+                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
+                    auto& Command = Handle->Reader().Create(Query);
+                    vector<Access::DocumentDataPtr> Items;
+                    for (auto& Row : Command.Open()) {
+                        Access::DocumentDataPtr Item = new Access::DocumentData();
+                        FillHeaderFromRow(Item, Row);
+                        Items.push_back(Item);
+                    }
+                    
+                    return Items;
+                }
+            )
+        );
+    }
+    
+    vector<Access::DocumentDataPtr> Result;
+    
+    for (auto& Found : Intermediates) {
+        auto Items = Found.get();
+        for(auto Item : Items) Result.push_back(Item);
+    }
+    
+    return Result;
 }
 
 void DocumentStorage::Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)
@@ -190,7 +239,7 @@ void DocumentStorage::Save(const Access::DocumentDataPtr& document, const Access
     }
 }
 
-void DocumentStorage::Lock(const std::string& id, const std::string& user) const
+void DocumentStorage::Lock(const string& id, const string& user) const
 {
     ReadOnlyDenied(user);
     
@@ -206,7 +255,7 @@ void DocumentStorage::Lock(const std::string& id, const std::string& user) const
     Actions.Flush();
 }
 
-void DocumentStorage::Unlock(const std::string& id, const std::string& user) const
+void DocumentStorage::Unlock(const string& id, const string& user) const
 {
     ReadOnlyDenied(user);
     
@@ -348,7 +397,7 @@ WHERE
     return Result;
 }
 
-Access::DocumentDataPtr DocumentStorage::Fetch(BucketHandle handle, const std::string& id) const
+Access::DocumentDataPtr DocumentStorage::Fetch(BucketHandle handle, const string& id) const
 {
     DocumentTransformer Transformer(handle->Reading());
     Access::DocumentDataPtr Result = new Access::DocumentData();

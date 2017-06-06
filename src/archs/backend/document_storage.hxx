@@ -52,6 +52,7 @@ public:
     void Unlock(const std::string& id, const std::string& user) const;
     Access::DocumentDataPtr FindById(const std::string& id, int number = 0) const;
     Access::DocumentDataPtr Find(const std::string& folderPath, const std::string& fileName) const;
+    std::vector<Access::DocumentDataPtr> FindTitle(const std::string& folderPath, const std::string& displayName) const;
 };
 
 } // Backend
