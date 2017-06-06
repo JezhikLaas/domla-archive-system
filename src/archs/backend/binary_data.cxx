@@ -232,7 +232,6 @@ vector<unsigned char> BinaryData::CreatePatch(const vector<unsigned char>& oldDa
 	const u_char *olds;
     const u_char *news;
 	off_t oldsize,newsize;
-	off_t *I,*V;
 	off_t scan,pos,len;
 	off_t lastscan,lastpos,lastoffset;
 	off_t oldscore,scsc;
@@ -240,7 +239,6 @@ vector<unsigned char> BinaryData::CreatePatch(const vector<unsigned char>& oldDa
 	off_t overlap,Ss,lens;
 	off_t i;
 	off_t dblen,eblen;
-	u_char *db,*eb;
 	u_char buf[8];
 	u_char header[32];
     
@@ -250,17 +248,14 @@ vector<unsigned char> BinaryData::CreatePatch(const vector<unsigned char>& oldDa
     newsize = newData.size();
 
     vector<unsigned char> patch(sizeof(header));
-    
-	if(((I=(off_t*)malloc((oldsize+1)*sizeof(off_t)))==NULL) ||
-		((V=(off_t*)malloc((oldsize+1)*sizeof(off_t)))==NULL)) return patch;
+    vector<off_t> I(oldsize + 1);
+    vector<off_t> V(oldsize + 1);
 
-	qsufsort(I,V,olds,oldsize);
-
-	free(V);
-
-	if(((db=(u_char*)malloc(newsize+1))==NULL) ||
-		((eb=(u_char*)malloc(newsize+1))==NULL)) return patch;
+    vector<unsigned char> db(newsize + 1);
+    vector<unsigned char> eb(newsize + 1);
 	
+    qsufsort(&I[0],&V[0],olds,oldsize);
+
     dblen=0;
 	eblen=0;
 
@@ -296,7 +291,7 @@ vector<unsigned char> BinaryData::CreatePatch(const vector<unsigned char>& oldDa
 		oldscore=0;
 
 		for(scsc=scan+=len;scan<newsize;scan++) {
-			len=search(I,olds,oldsize,news+scan,newsize-scan,
+			len=search(&I[0],olds,oldsize,news+scan,newsize-scan,
 					0,oldsize,&pos);
 
 			for(;scsc<scan+len;scsc++)
@@ -393,7 +388,7 @@ vector<unsigned char> BinaryData::CreatePatch(const vector<unsigned char>& oldDa
     ctrl.next_out = (char*)output;
     ctrl.avail_out = 512;
     
-    ctrl.next_in = (char*)db;
+    ctrl.next_in = (char*)&db[0];
     ctrl.avail_in = dblen;
 	
     CHECK_BZ(BZ2_bzCompress(&ctrl, BZ_RUN), BZ_RUN_OK);
@@ -407,26 +402,25 @@ vector<unsigned char> BinaryData::CreatePatch(const vector<unsigned char>& oldDa
 	CHECK_BZ(BZ2_bzCompressEnd(&ctrl), BZ_OK);
 
 	/* Write compressed extra data */
-    CHECK_BZ(BZ2_bzCompressInit(&ctrl, 9, 0, 30), BZ_OK);
-    ctrl.next_out = (char*)output;
-    ctrl.avail_out = 512;
-    
-    ctrl.next_in = (char*)eb;
-    ctrl.avail_in = eblen;
-	
-    CHECK_BZ(BZ2_bzCompress(&ctrl, BZ_RUN), BZ_RUN_OK);
-    while (CHECKV_BZ(BZ2_bzCompress(&ctrl, BZ_FINISH), BZ_FINISH_OK, BZ_STREAM_END) != BZ_STREAM_END) {
+    if (eblen > 0) {
+        CHECK_BZ(BZ2_bzCompressInit(&ctrl, 9, 0, 30), BZ_OK);
         ctrl.next_out = (char*)output;
         ctrl.avail_out = 512;
+        
+        ctrl.next_in = (char*)&eb[0];
+        ctrl.avail_in = eblen;
+        
+        CHECK_BZ(BZ2_bzCompress(&ctrl, BZ_RUN), BZ_RUN_OK);
+        while (CHECKV_BZ(BZ2_bzCompress(&ctrl, BZ_FINISH), BZ_FINISH_OK, BZ_STREAM_END) != BZ_STREAM_END) {
+            ctrl.next_out = (char*)output;
+            ctrl.avail_out = 512;
+        }
+        for (unsigned index = 0; index < 512 - ctrl.avail_out; ++index) patch.push_back(output[index]);
+        
+        CHECK_BZ(BZ2_bzCompressEnd(&ctrl), BZ_OK);
     }
-	for (unsigned index = 0; index < 512 - ctrl.avail_out; ++index) patch.push_back(output[index]);
-	
-	CHECK_BZ(BZ2_bzCompressEnd(&ctrl), BZ_OK);
-
+    
     memcpy(&patch[0], header, 32);
-	free(db);
-	free(eb);
-	free(I);
 
 	return patch;
 }
@@ -477,7 +471,7 @@ vector<unsigned char> BinaryData::ApplyPatch(const vector<unsigned char>& data, 
     dataz.next_in = (char*)&patch[32 + bzctrllen];
     
     extra.avail_in = patch.size() - (32 + bzctrllen + bzdatalen);
-    extra.next_in = (char*)&patch[32 + bzctrllen + bzdatalen];
+    extra.next_in = extra.avail_in ? (char*)&patch[32 + bzctrllen + bzdatalen] : nullptr;
 
 	oldpos=0;newpos=0;
 	while(newpos<newsize) {
@@ -510,10 +504,11 @@ vector<unsigned char> BinaryData::ApplyPatch(const vector<unsigned char>& data, 
 		if(newpos+ctrl[1]>newsize) throw runtime_error("invalid patch");
 
 		/* Read extra string */
-        extra.next_out = (char*)news + newpos;
-        extra.avail_out = ctrl[1];
-		CHECKV_BZ(BZ2_bzDecompress(&extra), BZ_OK, BZ_STREAM_END);
-
+        if (extra.avail_in) {
+            extra.next_out = (char*)news + newpos;
+            extra.avail_out = ctrl[1];
+            CHECKV_BZ(BZ2_bzDecompress(&extra), BZ_OK, BZ_STREAM_END);
+        }
 		/* Adjust pointers */
 		newpos+=ctrl[1];
 		oldpos+=ctrl[2];
