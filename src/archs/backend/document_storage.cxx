@@ -72,6 +72,21 @@ DocumentStorage::~DocumentStorage()
     for (auto& Bucket : Buckets_) Bucket.reset();
 }
 
+vector<Access::FolderInfo> DocumentStorage::FoldersForPath(const string& root) const
+{
+    vector<Access::FolderInfo> Result;
+    auto& Infos = Folders_.Content(root);
+    transform(
+        Infos.begin(),
+        Infos.end(),
+        back_inserter(Result), [](const FolderInfo& info) {
+            return Access::FolderInfo { get<2>(info), get<1>(info) };
+        }
+    );
+    
+    return Result;
+}
+
 Access::DocumentDataPtr DocumentStorage::Load(const string& id, const string& user) const
 {
     auto Handle = FetchBucket(id);
@@ -274,31 +289,11 @@ void DocumentStorage::Unlock(const string& id, const string& user) const
 
 void DocumentStorage::Move(const string& id, const string& oldPath, const string& newPath, const string& user) const
 {
-    const string QueryTemplate =
-R"(SELECT
-    %1%
-FROM
-    DocumentAssignments asg
-INNER JOIN
-    DocumentHistories hst
-ON
-    asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
-WHERE
-    asg.Path = '%2%'
-AND
-    hst.Owner = '%3%'
-)";
-
     ReadOnlyDenied(user);
     auto Handle = FetchBucket(id);
     Guard Lock(Handle->WriteGuard);
 
-    AssignmentTransformer Transformer;
-    Access::DocumentAssignmentPtr Assignment = new Access::DocumentAssignment();
-    auto Fields = AliasFields(AssignmentTransformer::FieldNames(), "asg");
-    auto& Command = Handle->Writer().Create((format(QueryTemplate) % Fields % algorithm::to_lower_copy(oldPath) % id).str());
-    auto& Data = Command.Open();
-    if (Transformer.Load(Data, *Assignment) == false) throw Access::NotFoundError((format("no assignment for document id %1%") % id).str());
+    Access::DocumentAssignmentPtr Assignment = Fetch(Handle->Writing(), id, oldPath);
 
     auto& FolderInfo = async(launch::async, [this, &newPath, &oldPath]() {
          Folders_.Add(newPath);
@@ -322,6 +317,26 @@ AND
     Actions.Update(*Assignment);
     
     Actions.Flush();
+    
+    FolderInfo.wait();
+}
+
+void DocumentStorage::Copy(const string& id, const string& sourcePath, const string& targetPath, const string& user) const
+{
+    ReadOnlyDenied(user);
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentAssignmentPtr Assignment = Fetch(Handle->Writing(), id, sourcePath);
+    auto Item = Fetch(Handle, id);
+
+    auto& FolderInfo = async(launch::async, [this, &targetPath]() {
+         Folders_.Add(targetPath);
+    });
+    
+    Access::DocumentDataPtr Clone = new Access::DocumentData(*Item);
+    Clone->FolderPath = targetPath;
+    InsertIntoDatabase(Clone, LatestContent(Handle->Writing(), Item->Id)->Content, "");
     
     FolderInfo.wait();
 }
@@ -479,7 +494,7 @@ void DocumentStorage::ReadOnlyDenied(const string& user) const
     if (user == Access::ViewOnlyUser) throw Authentication::AuthenticationError("read only user is not permitted for this operation");
 }
 
-void DocumentStorage::InsertIntoDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& comment)
+void DocumentStorage::InsertIntoDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& comment) const
 {
     document->Id = Utils::NewId();
     auto Handle = FetchBucket(document->Id);
@@ -534,7 +549,7 @@ void DocumentStorage::InsertIntoDatabase(const Access::DocumentDataPtr& document
     FolderInfo.wait();
 }
 
-void DocumentStorage::UpdateInDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)
+void DocumentStorage::UpdateInDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment) const
 {
     auto Handle = FetchBucket(document->Id);
     Guard Lock(Handle->WriteGuard);
@@ -630,4 +645,31 @@ AND
     if (Transformer.Load(Data, *Result) == false) throw Access::NotFoundError((format("no content for document id %1%") % id).str());
 
     return Result;
+}
+
+Access::DocumentAssignmentPtr DocumentStorage::Fetch(SQLite::Connection* connection, const string& id, const string& path) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    %1%
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst
+ON
+    asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+WHERE
+    asg.Path = '%2%'
+AND
+    hst.Owner = '%3%'
+)";
+
+    AssignmentTransformer Transformer;
+    Access::DocumentAssignmentPtr Assignment = new Access::DocumentAssignment();
+    auto Fields = AliasFields(AssignmentTransformer::FieldNames(), "asg");
+    auto& Command = connection->Create((format(QueryTemplate) % Fields % algorithm::to_lower_copy(path) % id).str());
+    auto& Data = Command.Open();
+    if (Transformer.Load(Data, *Assignment) == false) throw Access::NotFoundError((format("no assignment for document id %1%") % id).str());
+
+    return Assignment;
 }

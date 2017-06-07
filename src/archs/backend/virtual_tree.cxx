@@ -11,8 +11,21 @@ using namespace boost;
 
 using LockType = lock_guard<recursive_mutex>;
 
+namespace
+{
+
+recursive_mutex& DisplaySync()
+{
+    static recursive_mutex DisplaySync_;
+    return DisplaySync_;
+}
+
+} // anonymous namespace
+
 const string& VirtualFolder::Display() const
 {
+    LockType Lock(DisplaySync());
+    
     if (Display_.empty() == false) return Display_;
     
     Display_ = Name_;

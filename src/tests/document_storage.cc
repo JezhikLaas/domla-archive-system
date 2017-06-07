@@ -210,3 +210,50 @@ BOOST_AUTO_TEST_CASE(Move_Document)
 
     BOOST_CHECK(Loaded->FolderPath == "/two");
 }
+
+BOOST_AUTO_TEST_CASE(Folder_Infos_Follow_Move)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    auto Infos = Storage.FoldersForPath("/");
+    BOOST_CHECK(Infos.size() == 1);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    Header->Display = "Testing";
+    
+    Storage.Save(Header, Content, "willi");
+    
+    Infos = Storage.FoldersForPath("/");
+    BOOST_CHECK(Infos.size() == 2);
+    BOOST_CHECK(Infos[1].Name == "/one");
+    
+    Storage.Move(Header->Id, "/one", "/two", "willi");
+    
+    Infos = Storage.FoldersForPath("/");
+    BOOST_CHECK(Infos.size() == 2);
+    BOOST_CHECK(Infos[1].Name == "/two");
+}
+
+BOOST_AUTO_TEST_CASE(Copy_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    Header->Display = "Testing";
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Copy(Header->Id, "/one", "/two", "willi");
+    
+    auto Check = Storage.FindTitle("/two", "Testing");
+
+    BOOST_CHECK(Check.empty() == false);
+    BOOST_CHECK(Check[0]->Id.empty() == false);
+}
