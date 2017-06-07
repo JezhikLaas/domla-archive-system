@@ -58,6 +58,7 @@ public:
     void Move(const std::string& id, const std::string& oldPath, const std::string& newPath, const std::string& user) const;
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Link(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
+    void Associate(const std::string& id, const std::string& path, const std::string& item, const std::string& type, const std::string& user) const;
 };
 
 } // Backend

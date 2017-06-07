@@ -187,7 +187,7 @@ protected:
         target["Owner"].SetValue(item.History);
         target["SeqId"].SetValue(item.Revision);
         target["AssignmentType"].SetValue(item.AssignmentType);
-        target["AssignmentType"].SetValue(item.AssignmentId);
+        target["AssignmentId"].SetValue(item.AssignmentId);
         target["Path"].SetValue(item.Path);
     }
 

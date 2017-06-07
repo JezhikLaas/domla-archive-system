@@ -381,6 +381,21 @@ void DocumentStorage::Copy(const string& id, const string& sourcePath, const str
     FolderInfo.wait();
 }
 
+void DocumentStorage::Associate(const string& id, const string& path, const string& item, const string& type, const string& user) const
+{
+    ReadOnlyDenied(user);
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentAssignmentPtr Assignment = Fetch(Handle->Writing(), id, path);
+    Assignment->AssignmentId = item;
+    Assignment->AssignmentType = type;
+    
+    TransformerQueue Actions(Handle->Writing());
+    Actions.Update(*Assignment);
+    Actions.Flush();
+}
+
 void DocumentStorage::InitializeBuckets()
 {
     if (Settings_.DataLocation() != ":memory:") create_directory(Settings_.DataLocation());
