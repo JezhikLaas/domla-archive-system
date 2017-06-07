@@ -321,6 +321,46 @@ void DocumentStorage::Move(const string& id, const string& oldPath, const string
     FolderInfo.wait();
 }
 
+void DocumentStorage::Link(const string& id, const string& sourcePath, const string& targetPath, const string& user) const
+{
+    ReadOnlyDenied(user);
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentAssignmentPtr Assignment = Fetch(Handle->Writing(), id, sourcePath);
+    auto Item = Fetch(Handle, id);
+
+    auto& FolderInfo = async(launch::async, [this, &targetPath]() {
+         Folders_.Add(targetPath);
+    });
+    
+    TransformerQueue Actions(Handle->Writing());
+    
+    Access::DocumentHistoryEntryPtr History = new Access::DocumentHistoryEntry();
+    History->Id = Utils::NewId();
+    History->Action = Access::Linked;
+    History->Actor = user;
+    History->Created = Utils::Ticks(microsec_clock::local_time());
+    History->Document = id;
+    History->Revision = LatestRevision(Handle->Writing(), id) + 1;
+    History->Source = sourcePath;
+    History->Target = targetPath;
+    Actions.Insert(*History);
+    
+    Access::DocumentAssignmentPtr NewAssignment = new Access::DocumentAssignment();
+    NewAssignment->History = History->Id;
+    NewAssignment->Id = Utils::NewId();
+    NewAssignment->Path = targetPath;
+    NewAssignment->AssignmentId = Assignment->AssignmentId;
+    NewAssignment->AssignmentType = Assignment->AssignmentType;
+    NewAssignment->Revision = History->Revision;
+    Actions.Insert(*NewAssignment);
+    
+    Actions.Flush();
+    
+    FolderInfo.wait();
+}
+
 void DocumentStorage::Copy(const string& id, const string& sourcePath, const string& targetPath, const string& user) const
 {
     ReadOnlyDenied(user);

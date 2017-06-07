@@ -256,4 +256,26 @@ BOOST_AUTO_TEST_CASE(Copy_Document)
 
     BOOST_CHECK(Check.empty() == false);
     BOOST_CHECK(Check[0]->Id.empty() == false);
+    BOOST_CHECK(Check[0]->Id != Header->Id);
+}
+
+BOOST_AUTO_TEST_CASE(Link_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    Header->Display = "Testing";
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Link(Header->Id, "/one", "/two", "willi");
+    
+    auto Check = Storage.FindTitle("/two", "Testing");
+
+    BOOST_CHECK(Check.empty() == false);
+    BOOST_CHECK(Check[0]->Id.empty() == false);
+    BOOST_CHECK(Check[0]->Id == Header->Id);
 }

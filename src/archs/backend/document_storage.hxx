@@ -57,6 +57,7 @@ public:
     std::vector<Access::DocumentDataPtr> FindTitle(const std::string& folderPath, const std::string& displayName) const;
     void Move(const std::string& id, const std::string& oldPath, const std::string& newPath, const std::string& user) const;
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
+    void Link(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
 };
 
 } // Backend
