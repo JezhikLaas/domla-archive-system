@@ -13,6 +13,7 @@ class SettingsProvider
 public:
     virtual const std::string& DataLocation() const = 0;
     virtual int Backends() const { return 1; }
+    virtual const std::string FulltextFile() const;
 };
 
 } // namespace Backend

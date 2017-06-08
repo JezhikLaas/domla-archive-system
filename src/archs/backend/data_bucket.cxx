@@ -26,12 +26,12 @@ DataBucket::DataBucket(int id, const SettingsProvider& settings)
     Setup.PageSize = 65536;
     Setup.MaxPageCount = 2147483646;
     
-    Write = unique_ptr<SQLite::Connection>(new SQLite::Connection(Setup));
+    Write = make_unique<SQLite::Connection>(Setup);
     Write->OpenAlways();
     DocumentSchema::Ensure(Writer());
     
     Setup.ReadOnly = true;
 
-    Read = unique_ptr<SQLite::Connection>(new SQLite::Connection(Setup));
+    Read = make_unique<SQLite::Connection>(Setup);
     Read->Open();
 }

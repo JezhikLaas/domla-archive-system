@@ -6,7 +6,7 @@ enable_testing()
 find_package(Ice)
 find_package(Boost)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/lib ${CMAKE_CURRENT_SOURCE_DIR}/src/archs/backend/bzip2-1.0.5 ${Ice_INCLUDE_DIR} SYSTEM ${Boost_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/lib ${CMAKE_CURRENT_SOURCE_DIR}/src/archs/backend/bzip2-1.0.5 $ENV{XAPIAN_HOME}/include ${Ice_INCLUDE_DIR} SYSTEM ${Boost_INCLUDE_DIRS})
 file(GLOB TEST_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/tests/*.cc)
 
 add_custom_command(
@@ -78,6 +78,8 @@ add_library(
     src/archs/backend/sqlite.cxx
     src/archs/backend/transformer.cxx
     src/archs/backend/virtual_tree.cxx
+    src/archs/backend/full_text.cxx
+    src/archs/backend/settings_provider.cxx
 )
 
 add_executable(
@@ -91,6 +93,7 @@ target_link_libraries(
     bzip2lib
     sqlitelib
     archlib
+    $ENV{XAPIAN_HOME}/.libs/xapian-win.lib
 )
 
 foreach(testSrc ${TEST_SRCS})
@@ -103,6 +106,7 @@ foreach(testSrc ${TEST_SRCS})
         sqlitelib
         archlib
         bzip2lib
+        $ENV{XAPIAN_HOME}/.libs/xapian-win.lib
     )
 
     set_target_properties(

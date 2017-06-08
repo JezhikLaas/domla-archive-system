@@ -10,3 +10,4 @@ External requirements
 - cmake
 - zeroc ICE
 - boost
+- xapian
