@@ -62,6 +62,7 @@ public:
     void Associate(const std::string& id, const std::string& path, const std::string& item, const std::string& type, const std::string& user) const;
     void Delete(const std::string& id, const std::string& user) const;
     void Undelete(const std::string& id, const std::string& user) const;
+    void Undelete(const std::vector<std::string>& ids, const std::string& user) const;
 };
 
 } // Backend
