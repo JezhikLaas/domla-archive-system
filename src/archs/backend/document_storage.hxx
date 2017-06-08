@@ -36,6 +36,7 @@ private:
     void InsertIntoDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& comment) const;
     void UpdateInDatabase(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment) const;
     Access::DocumentDataPtr Fetch(BucketHandle handle, const std::string& id) const;
+    Access::DocumentDataPtr FetchChecked(BucketHandle handle, const std::string& id, const std::string& user) const;
     int LatestRevision(SQLite::Connection* connection, const std::string& id) const;
     Access::DocumentContentPtr LatestContent(SQLite::Connection* connection, const std::string& id) const;
     Access::DocumentAssignmentPtr Fetch(SQLite::Connection* connection, const std::string& id, const std::string& path) const;
@@ -55,6 +56,7 @@ public:
     void Unlock(const std::string& id, const std::string& user) const;
     Access::DocumentDataPtr FindById(const std::string& id, int number = 0) const;
     Access::DocumentDataPtr Find(const std::string& folderPath, const std::string& fileName) const;
+    std::vector<Access::DocumentDataPtr> FindKeywords(const std::string& keywords) const;
     std::vector<Access::DocumentDataPtr> FindTitle(const std::string& folderPath, const std::string& displayName) const;
     void Move(const std::string& id, const std::string& oldPath, const std::string& newPath, const std::string& user) const;
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
@@ -63,6 +65,7 @@ public:
     void Delete(const std::string& id, const std::string& user) const;
     void Undelete(const std::string& id, const std::string& user) const;
     void Undelete(const std::vector<std::string>& ids, const std::string& user) const;
+    void AssignKeywords(const std::string& id, const std::string& keywords, const std::string& user);
 };
 
 } // Backend

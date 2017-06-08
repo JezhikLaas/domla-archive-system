@@ -121,6 +121,32 @@ Access::DocumentDataPtr DocumentStorage::Load(const string& id, const string& us
     return Fetch(Handle, id);
 }
 
+void DocumentStorage::AssignKeywords(const string& id, const string& keywords, const string& user)
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentDataPtr Document = FetchChecked(Handle, id, user);
+    
+    TransformerQueue Actions(Handle->Writing());
+    
+    Document->Keywords = keywords;
+    Actions.Update(*Document);
+    
+    Access::DocumentHistoryEntryPtr History = new Access::DocumentHistoryEntry();
+    History->Id = Utils::NewId();
+    History->Action = Access::Keywords;
+    History->Actor = user;
+    History->Created = Utils::Ticks(microsec_clock::local_time());
+    History->Document = id;
+    History->Revision = LatestRevision(Handle->Writing(), id) + 1;
+    Actions.Insert(*History);
+    
+    Actions.Flush();
+}
+
 Access::DocumentDataPtr DocumentStorage::FindById(const string& id, int number) const
 {
     const string QueryTemplate =
@@ -270,6 +296,59 @@ WHERE
     return Result;
 }
 
+vector<Access::DocumentDataPtr> DocumentStorage::FindKeywords(const string& keywords) const
+{
+            const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+WHERE
+    (%1%) AND doc.State = 0
+)";
+    auto Values = Utils::Split(keywords, ' ');
+    vector<string> Parts;
+    transform(Values.begin(), Values.end(), back_inserter(Parts), [](const string& word) { return "doc.Keywords LIKE '%" + word + "%'"; });
+    auto Restrict = join(Parts, " OR ");
+    auto Query = (format(QueryTemplate) % Restrict).str();
+    
+    vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
+    
+    for (auto& Handle : DistinctHandles_) {
+        Intermediates.push_back(
+            async(
+                [&Handle, &Query]() {
+                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
+                    auto& Command = Handle->Reader().Create(Query);
+                    vector<Access::DocumentDataPtr> Items;
+                    for (auto& Row : Command.Open()) {
+                        Access::DocumentDataPtr Item = new Access::DocumentData();
+                        FillHeaderFromRow(Item, Row);
+                        Items.push_back(Item);
+                    }
+                    
+                    return Items;
+                }
+            )
+        );
+    }
+    
+    vector<Access::DocumentDataPtr> Result;
+    
+    for (auto& Found : Intermediates) {
+        auto Items = Found.get();
+        for(auto Item : Items) Result.push_back(Item);
+    }
+    
+    return Result;
+}
+
 void DocumentStorage::Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)
 {
     if (document->Id.empty()) {
@@ -289,7 +368,7 @@ void DocumentStorage::Lock(const string& id, const string& user) const
     auto Handle = FetchBucket(id);
     Guard Lock(Handle->WriteGuard);
     
-    Access::DocumentDataPtr Document = Fetch(Handle, id);
+    Access::DocumentDataPtr Document = FetchChecked(Handle, id, user);
     if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is already locked by %2%") % Document->Display % Document->Locker).str());
     
     TransformerQueue Actions(Handle->Writing());
@@ -305,9 +384,7 @@ void DocumentStorage::Unlock(const string& id, const string& user) const
     auto Handle = FetchBucket(id);
     Guard Lock(Handle->WriteGuard);
     
-    Access::DocumentDataPtr Document = Fetch(Handle, id);
-    if (Document->Locker.empty()) throw Access::LockError((format("document %1% is not locked") % Document->Display).str());
-    if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is locked by %2%") % Document->Display % Document->Locker).str());
+    Access::DocumentDataPtr Document = FetchChecked(Handle, id, user);
     
     TransformerQueue Actions(Handle->Writing());
     Document->Locker = "";
@@ -679,6 +756,20 @@ Access::DocumentDataPtr DocumentStorage::Fetch(BucketHandle handle, const string
     
     Guard Lock(handle->ReadGuard);
     if (Transformer.Load(*Result) == false) throw Access::NotFoundError((format("a document with id %1% is not known") % id).str());
+    
+    return Result;
+}
+
+Access::DocumentDataPtr DocumentStorage::FetchChecked(BucketHandle handle, const string& id, const string& user) const
+{
+    DocumentTransformer Transformer(handle->Reading());
+    Access::DocumentDataPtr Result = new Access::DocumentData();
+    Result->Id = id;
+    
+    Guard Lock(handle->ReadGuard);
+    if (Transformer.Load(*Result) == false) throw Access::NotFoundError((format("a document with id %1% is not known") % id).str());
+    if (Result->Locker.empty() == false && Result->Locker != user) throw Access::LockError((format("document %1% is locked by %2%") % Result->Display % Result->Locker).str());
+    if (Result->Deleted) throw Access::LockError((format("document %1% is in the deleted state") % Result->Display).str());
     
     return Result;
 }

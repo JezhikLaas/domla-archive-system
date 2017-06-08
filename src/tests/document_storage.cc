@@ -367,3 +367,19 @@ BOOST_AUTO_TEST_CASE(Undelete_Documents)
 
     BOOST_CHECK(Header->Deleted == false);
 }
+
+BOOST_AUTO_TEST_CASE(Find_By_Keywords)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.AssignKeywords(Header->Id, "one two three", "willi");
+    
+    auto Headers = Storage.FindKeywords("two one");
+
+    BOOST_CHECK(Headers.size() == 1);
+}
