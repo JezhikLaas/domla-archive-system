@@ -87,6 +87,34 @@ vector<Access::FolderInfo> DocumentStorage::FoldersForPath(const string& root) c
     return Result;
 }
 
+std::vector<std::string> DocumentStorage::FoldersOf(const std::string& id) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    asg.Path
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst
+ON
+    asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+WHERE
+    hst.Owner = '%1%'
+)";
+    auto Query = (format(QueryTemplate) % id).str();
+    auto& Handle = FetchBucket(id);
+    
+    Guard Lock(Handle->ReadGuard);
+    
+    auto& Command = Handle->Reader().Create(Query);
+    auto& Data = Command.Open();
+    
+    vector<string> Result;
+    transform(Data.begin(), Data.end(), back_inserter(Result), [](auto& row) { return row.Get<string>(0); });
+    
+    return Result;
+}
+
 Access::DocumentDataPtr DocumentStorage::Load(const string& id, const string& user) const
 {
     auto Handle = FetchBucket(id);
@@ -394,6 +422,86 @@ void DocumentStorage::Associate(const string& id, const string& path, const stri
     TransformerQueue Actions(Handle->Writing());
     Actions.Update(*Assignment);
     Actions.Flush();
+}
+
+void DocumentStorage::Delete(const string& id, const string& user) const
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentDataPtr Document = Fetch(Handle, id);
+    if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is locked by %2%") % Document->Display % Document->Locker).str());
+    if (Document->Deleted) throw Access::LockError((format("document %1% is already in the deleted state") % Document->Display).str());
+    
+    auto Folders = FoldersOf(id);
+    auto& FolderInfo = async(launch::async, [this, &Folders, &Document]() {
+         for (auto& Folder : Folders) {
+             if (Document->Name == Access::DocumentDirectoryName)
+                Folders_.RemoveUncounted(Folder);
+             else {
+                Folders_.Remove(Folder);
+             }
+         }
+    });
+    
+    TransformerQueue Actions(Handle->Writing());
+    
+    Document->Deleted = true;
+    Actions.Update(*Document);
+    
+    Access::DocumentHistoryEntryPtr History = new Access::DocumentHistoryEntry();
+    History->Id = Utils::NewId();
+    History->Action = Access::Deleted;
+    History->Actor = user;
+    History->Created = Utils::Ticks(microsec_clock::local_time());
+    History->Document = id;
+    History->Revision = LatestRevision(Handle->Writing(), id) + 1;
+    Actions.Insert(*History);
+    
+    Actions.Flush();
+    FolderInfo.wait();
+}
+
+void DocumentStorage::Undelete(const string& id, const string& user) const
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentDataPtr Document = Fetch(Handle, id);
+    if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is locked by %2%") % Document->Display % Document->Locker).str());
+    if (Document->Deleted == false) throw Access::LockError((format("document %1% is not in the deleted state") % Document->Display).str());
+    
+    auto Folders = FoldersOf(id);
+    auto& FolderInfo = async(launch::async, [this, &Folders, &Document]() {
+         for (auto& Folder : Folders) {
+             if (Document->Name == Access::DocumentDirectoryName)
+                Folders_.AddUncounted(Folder);
+             else {
+                Folders_.Add(Folder);
+             }
+         }
+    });
+    
+    TransformerQueue Actions(Handle->Writing());
+    
+    Document->Deleted = false;
+    Actions.Update(*Document);
+    
+    Access::DocumentHistoryEntryPtr History = new Access::DocumentHistoryEntry();
+    History->Id = Utils::NewId();
+    History->Action = Access::Recovered;
+    History->Actor = user;
+    History->Created = Utils::Ticks(microsec_clock::local_time());
+    History->Document = id;
+    History->Revision = LatestRevision(Handle->Writing(), id) + 1;
+    Actions.Insert(*History);
+    
+    Actions.Flush();
+    FolderInfo.wait();
 }
 
 void DocumentStorage::InitializeBuckets()

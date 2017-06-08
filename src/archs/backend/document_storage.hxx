@@ -48,6 +48,7 @@ public:
 
 public:
     std::vector<Access::FolderInfo> FoldersForPath(const std::string& root) const;
+    std::vector<std::string> FoldersOf(const std::string& id) const;
     Access::DocumentDataPtr Load(const std::string& id, const std::string& user) const;
     void Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment = "");
     void Lock(const std::string& id, const std::string& user) const;
@@ -59,6 +60,8 @@ public:
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Link(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Associate(const std::string& id, const std::string& path, const std::string& item, const std::string& type, const std::string& user) const;
+    void Delete(const std::string& id, const std::string& user) const;
+    void Undelete(const std::string& id, const std::string& user) const;
 };
 
 } // Backend

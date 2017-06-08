@@ -298,3 +298,55 @@ BOOST_AUTO_TEST_CASE(Associate_Info_To_Document)
     BOOST_CHECK(Loaded->AssociatedItem == "AnId");
     BOOST_CHECK(Loaded->AssociatedClass == "AType");
 }
+
+BOOST_AUTO_TEST_CASE(Folder_Names_For_Linked_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    Header->Display = "Testing";
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Link(Header->Id, "/one", "/two", "willi");
+    
+    auto Check = Storage.FoldersOf(Header->Id);
+
+    BOOST_CHECK(Check.size() == 2);
+}
+
+BOOST_AUTO_TEST_CASE(Delete_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Delete(Header->Id, "willi");
+    
+    Header = Storage.Load(Header->Id, "willi");
+
+    BOOST_CHECK(Header->Deleted);
+}
+
+BOOST_AUTO_TEST_CASE(Undelete_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Delete(Header->Id, "willi");
+    Storage.Undelete(Header->Id, "willi");
+    
+    Header = Storage.Load(Header->Id, "willi");
+
+    BOOST_CHECK(Header->Deleted == false);
+}
