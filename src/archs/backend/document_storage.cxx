@@ -2,7 +2,6 @@
 #include "document_storage.hxx"
 #include "document_schema.hxx"
 #include "transformer.hxx"
-#include "utils.hxx"
 #include "Archive.h"
 #include "Authentication.h"
 #include <math.h>
@@ -10,6 +9,7 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/bind.hpp>
 #include <boost/date_time/gregorian/gregorian_types.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/filesystem.hpp>
@@ -59,7 +59,7 @@ void FillHeaderFromRow(Access::DocumentDataPtr& target, const SQLite::ResultRow&
 using Guard = lock_guard<recursive_mutex>;
 
 DocumentStorage::DocumentStorage(const SettingsProvider& settings)
-: Settings_(settings)
+: Settings_(settings), Timer_(hours(3), boost::bind(&DocumentStorage::Optimizer, this))
 {
     InitializeBuckets();
     RegisterTransformers();
@@ -1160,4 +1160,22 @@ AND
     if (Transformer.Load(Data, *Assignment) == false) throw Access::NotFoundError((format("no assignment for document id %1%") % id).str());
 
     return Assignment;
+}
+
+void DocumentStorage::Optimizer()
+{
+    vector<future<void>> Actions;
+    for (auto& Handle : DistinctHandles_) {
+        Actions.push_back(
+            async(
+                [&Handle]() {
+                    Guard Lock(Handle->WriteGuard);
+                    auto& Command = Handle->Reader().Create("PRAGMA optimize");
+                    Command.Execute();
+                }
+            )
+        );
+    }
+    
+    for (auto& Action : Actions) Action.wait();
 }

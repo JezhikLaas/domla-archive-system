@@ -8,6 +8,7 @@
 #include "settings_provider.hxx"
 #include "virtual_tree.hxx"
 #include "Archive.h"
+#include "utils.hxx"
 
 namespace Archive
 {
@@ -24,6 +25,7 @@ private:
     const SettingsProvider& Settings_;
     std::vector<BucketHandle> DistinctHandles_;
     mutable VirtualTree Folders_;
+    Utils::PeriodicTimer Timer_;
 
 private:
     void InitializeBuckets();
@@ -40,6 +42,7 @@ private:
     int LatestRevision(SQLite::Connection* connection, const std::string& id) const;
     Access::DocumentContentPtr LatestContent(SQLite::Connection* connection, const std::string& id) const;
     Access::DocumentAssignmentPtr Fetch(SQLite::Connection* connection, const std::string& id, const std::string& path) const;
+    void Optimizer();
     
 public:
     DocumentStorage(const SettingsProvider& settings);
