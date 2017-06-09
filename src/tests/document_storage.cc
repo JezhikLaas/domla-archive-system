@@ -526,3 +526,20 @@ BOOST_AUTO_TEST_CASE(Fetch_Document_History)
     
     BOOST_CHECK(Entries.size() == 2);
 }
+
+BOOST_AUTO_TEST_CASE(Rename_Documents)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->Display = "Eins";
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Rename(Header->Id, "willi", "Zwei");
+    
+    Header = Storage.Load(Header->Id, "willi");
+
+    BOOST_CHECK(Header->Display == "Zwei");
+}

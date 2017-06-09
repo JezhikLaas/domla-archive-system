@@ -70,6 +70,7 @@ public:
     void Delete(const std::string& id, const std::string& user) const;
     void Undelete(const std::string& id, const std::string& user) const;
     void Undelete(const std::vector<std::string>& ids, const std::string& user) const;
+    void Rename(const std::string& id, const std::string& user, const std::string& display) const;
     void AssignKeywords(const std::string& id, const std::string& keywords, const std::string& user) const;
     void AssignMetaData(const std::string& id, const std::string& data, const std::string& user) const;
     void ReplaceMetaData(const std::string& id, const std::string& data, const std::string& user) const;

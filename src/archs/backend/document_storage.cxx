@@ -845,6 +845,31 @@ void DocumentStorage::Undelete(const string& id, const string& user) const
     FolderInfo.wait();
 }
 
+void DocumentStorage::Rename(const string& id, const string& user, const string& display) const
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentDataPtr Document = FetchChecked(Handle, id, user);
+    TransformerQueue Actions(Handle->Writing());
+    
+    Document->Display = display;
+    Actions.Update(*Document);
+    
+    Access::DocumentHistoryEntryPtr History = new Access::DocumentHistoryEntry();
+    History->Id = Utils::NewId();
+    History->Action = Access::Retitled;
+    History->Actor = user;
+    History->Created = Utils::Ticks(microsec_clock::local_time());
+    History->Document = id;
+    History->Revision = LatestRevision(Handle->Writing(), id) + 1;
+    Actions.Insert(*History);
+    
+    Actions.Flush();
+}
+
 Access::DocumentContentPtr DocumentStorage::Read(const string& id, const string& user) const
 {
     auto& Handle = FetchBucket(id);
