@@ -121,7 +121,7 @@ Access::DocumentDataPtr DocumentStorage::Load(const string& id, const string& us
     return Fetch(Handle, id);
 }
 
-void DocumentStorage::AssignKeywords(const string& id, const string& keywords, const string& user)
+void DocumentStorage::AssignKeywords(const string& id, const string& keywords, const string& user) const
 {
     ReadOnlyDenied(user);
     
@@ -145,6 +145,143 @@ void DocumentStorage::AssignKeywords(const string& id, const string& keywords, c
     Actions.Insert(*History);
     
     Actions.Flush();
+}
+
+void DocumentStorage::AssignMetaData(const string& id, const string& data, const string& user) const
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    auto Tokens = Utils::Split(data, 30);
+    if (Tokens.empty()) throw invalid_argument("unable to parse meta tags");
+    
+    vector<string> Metas;
+    transform(
+        Tokens.begin(),
+        Tokens.end(),
+        back_inserter(Metas),
+        [](const string& token) {
+            auto Parts = Utils::Split(token, '=');
+            return Parts.size() == 2 ? Parts[0] : string();
+        }
+    );
+    
+    auto Transaction = Handle->Writing()->Begin();
+    {
+        auto Command = Handle->Writing()->Create("INSERT INTO DocumentMetas(Owner, Tags)VALUES(:Owner, :Tags)");
+        Command.Parameters()["Owner"].SetValue(id);
+        Command.Parameters()["Tags"].SetValue(data);
+        Command.Execute();
+    }
+    {
+        auto Command = Handle->Writing()->Create("REPLACE INTO DocumentTags(Tag)VALUES(:Tag)");
+        
+        for (auto& Meta : Metas) {
+            if (Meta.empty() == false) {
+                Command.Parameters()["Tag"].SetValue(Meta);
+                Command.Execute();
+            }
+        }
+    }
+    Transaction.Commit();
+}
+
+void DocumentStorage::ReplaceMetaData(const string& id, const string& data, const string& user) const
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    auto Tokens = Utils::Split(data, 30);
+    
+    vector<string> Metas;
+    transform(
+        Tokens.begin(),
+        Tokens.end(),
+        back_inserter(Metas),
+        [](const string& token) {
+            auto Parts = Utils::Split(token, '=');
+            return Parts.size() == 2 ? Parts[0] : string();
+        }
+    );
+    
+    auto Transaction = Handle->Writing()->Begin();
+    {
+        auto Command = Handle->Writing()->Create("DELETE FROM DocumentMetas WHERE Owner = :Owner");
+        Command.Parameters()["Owner"].SetValue(id);
+        Command.Execute();
+    }
+    if (data.empty() == false) {
+        auto Command = Handle->Writing()->Create("INSERT INTO DocumentMetas(Owner, Tags)VALUES(:Owner, :Tags)");
+        Command.Parameters()["Owner"].SetValue(id);
+        Command.Parameters()["Tags"].SetValue(data);
+        Command.Execute();
+    }
+    if (Metas.empty() == false) {
+        auto Command = Handle->Writing()->Create("REPLACE INTO DocumentTags(Tag)VALUES(:Tag)");
+        
+        for (auto& Meta : Metas) {
+            if (Meta.empty() == false) {
+                Command.Parameters()["Tag"].SetValue(Meta);
+                Command.Execute();
+            }
+        }
+    }
+    Transaction.Commit();
+}
+
+vector<string> DocumentStorage::ListMetaTags() const
+{
+    const string Query = "SELECT Tag FROM DocumentTags";
+
+    vector<future<vector<string>>> Intermediates;
+    
+    for (auto& Handle : DistinctHandles_) {
+        Intermediates.push_back(
+            async(
+                [&Handle, &Query]() {
+                    vector<string> Result;
+                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
+                    auto& Command = Handle->Reader().Create(Query);
+                    
+                    for (auto& Row : Command.Open()) {
+                        Result.push_back(Row.Get<string>(0));
+                    }
+                    
+                    return Result;
+                }
+            )
+        );
+    }
+    
+    vector<string> Result;
+    
+    for (auto& Found : Intermediates) {
+        auto& Item = Found.get();
+        copy(Item.cbegin(), Item.cend(), back_inserter(Result));
+    }
+    
+    return Result;
+}
+
+vector<string> DocumentStorage::ListMetaTags(const string& id) const
+{
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->ReadGuard);
+    
+    const string Query = "SELECT Tag FROM DocumentTags WHERE Owner = '" + id + "'";
+    
+    vector<string> Result;
+    auto& Command = Handle->Reader().Create(Query);
+    
+    for (auto& Row : Command.Open()) {
+        Result.push_back(Row.Get<string>(0));
+    }
+    
+    return Result;
 }
 
 Access::DocumentDataPtr DocumentStorage::FindById(const string& id, int number) const
@@ -298,7 +435,7 @@ WHERE
 
 vector<Access::DocumentDataPtr> DocumentStorage::FindKeywords(const string& keywords) const
 {
-            const string QueryTemplate =
+    const string QueryTemplate =
 R"(SELECT
     doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
 FROM
@@ -316,6 +453,61 @@ WHERE
     vector<string> Parts;
     transform(Values.begin(), Values.end(), back_inserter(Parts), [](const string& word) { return "doc.Keywords LIKE '%" + word + "%'"; });
     auto Restrict = join(Parts, " OR ");
+    auto Query = (format(QueryTemplate) % Restrict).str();
+    
+    vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
+    
+    for (auto& Handle : DistinctHandles_) {
+        Intermediates.push_back(
+            async(
+                [&Handle, &Query]() {
+                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
+                    auto& Command = Handle->Reader().Create(Query);
+                    vector<Access::DocumentDataPtr> Items;
+                    for (auto& Row : Command.Open()) {
+                        Access::DocumentDataPtr Item = new Access::DocumentData();
+                        FillHeaderFromRow(Item, Row);
+                        Items.push_back(Item);
+                    }
+                    
+                    return Items;
+                }
+            )
+        );
+    }
+    
+    vector<Access::DocumentDataPtr> Result;
+    
+    for (auto& Found : Intermediates) {
+        auto Items = Found.get();
+        for(auto Item : Items) Result.push_back(Item);
+    }
+    
+    return Result;
+}
+
+vector<Access::DocumentDataPtr> DocumentStorage::FindMetaData(const string& tags) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+INNER JOIN 
+    DocumentMetas ON DocumentMetas.Owner = doc.Id
+WHERE
+    DocumentMetas MATCH '%1%' AND doc.State = 0
+)";
+    auto Values = Utils::Split(tags, 30);
+    vector<string> Parts;
+    transform(Values.begin(), Values.end(), back_inserter(Parts), [](const string& word) { return "\"" + word + "\"*"; });
+    auto Restrict = join(Parts, " AND ");
     auto Query = (format(QueryTemplate) % Restrict).str();
     
     vector<future<vector<Access::DocumentDataPtr>>> Intermediates;

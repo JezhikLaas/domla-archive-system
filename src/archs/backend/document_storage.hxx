@@ -58,6 +58,7 @@ public:
     Access::DocumentDataPtr Find(const std::string& folderPath, const std::string& fileName) const;
     std::vector<Access::DocumentDataPtr> FindKeywords(const std::string& keywords) const;
     std::vector<Access::DocumentDataPtr> FindTitle(const std::string& folderPath, const std::string& displayName) const;
+    std::vector<Access::DocumentDataPtr> FindMetaData(const std::string& tags) const;
     void Move(const std::string& id, const std::string& oldPath, const std::string& newPath, const std::string& user) const;
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Link(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
@@ -65,7 +66,11 @@ public:
     void Delete(const std::string& id, const std::string& user) const;
     void Undelete(const std::string& id, const std::string& user) const;
     void Undelete(const std::vector<std::string>& ids, const std::string& user) const;
-    void AssignKeywords(const std::string& id, const std::string& keywords, const std::string& user);
+    void AssignKeywords(const std::string& id, const std::string& keywords, const std::string& user) const;
+    void AssignMetaData(const std::string& id, const std::string& data, const std::string& user) const;
+    void ReplaceMetaData(const std::string& id, const std::string& data, const std::string& user) const;
+    std::vector<std::string> ListMetaTags() const;
+    std::vector<std::string> ListMetaTags(const std::string& id) const;
 };
 
 } // Backend

@@ -383,3 +383,46 @@ BOOST_AUTO_TEST_CASE(Find_By_Keywords)
 
     BOOST_CHECK(Headers.size() == 1);
 }
+
+BOOST_AUTO_TEST_CASE(Assign_MetaData)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.AssignMetaData(Header->Id, string("InterneNummer=12345") + char(30) + "ExterneNummer=abc", "willi");
+}
+
+BOOST_AUTO_TEST_CASE(Search_MetaData)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.AssignMetaData(Header->Id, string("InterneNummer=12345") + char(30) + "ExterneNummer=abc", "willi");
+    
+    auto Result = Storage.FindMetaData("InterneNummer=123");
+    BOOST_CHECK(Result.size() == 1);
+}
+
+BOOST_AUTO_TEST_CASE(Erase_MetaData)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.AssignMetaData(Header->Id, string("InterneNummer=12345") + char(30) + "ExterneNummer=abc", "willi");
+    Storage.ReplaceMetaData(Header->Id, "", "willi");
+    
+    auto Result = Storage.FindMetaData("InterneNummer=123");
+    BOOST_CHECK(Result.size() == 0);
+}
