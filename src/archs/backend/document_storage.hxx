@@ -77,6 +77,7 @@ public:
     std::vector<std::string> ListMetaTags(const std::string& id) const;
     Access::DocumentContentPtr Read(const std::string& id, const std::string& user) const;
     Access::DocumentContentPtr Read(const std::string& id, const std::string& user, int revision) const;
+    std::vector<Access::DocumentHistoryEntryPtr> Revisions(const std::string& id) const;
 };
 
 } // Backend

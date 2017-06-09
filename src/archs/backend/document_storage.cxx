@@ -902,6 +902,27 @@ ORDER BY
     return Result;
 }
 
+vector<Access::DocumentHistoryEntryPtr> DocumentStorage::Revisions(const string& id) const
+{
+    const string QueryTemplate = "SELECT %1% FROM DocumentHistories WHERE Owner = '%2%'";
+    auto& Handle = FetchBucket(id);
+    Guard Lock(Handle->ReadGuard);
+
+    auto Fields = join(HistoryTransformer::FieldNames(), ", ");
+    auto Query = (format(QueryTemplate) % Fields % id).str();
+    auto Command = Handle->Reading()->Create(Query);
+    
+    vector<Access::DocumentHistoryEntryPtr> Result;
+    HistoryTransformer Transformer;
+    for (auto& Row : Command.Open()) {
+        Access::DocumentHistoryEntryPtr Entry = new Access::DocumentHistoryEntry();
+        Transformer.Load(Row, *Entry);
+        Result.push_back(Entry);
+    }
+    
+    return Result;
+}
+
 void DocumentStorage::InitializeBuckets()
 {
     if (Settings_.DataLocation() != ":memory:") create_directory(Settings_.DataLocation());

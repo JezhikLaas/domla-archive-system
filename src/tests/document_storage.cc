@@ -500,3 +500,29 @@ BOOST_AUTO_TEST_CASE(Retrieve_First_Version_Content)
     
     BOOST_CHECK(equal(Content.cbegin(), Content.cend(), Loaded->Content.cbegin(), Loaded->Content.cend()));
 }
+
+BOOST_AUTO_TEST_CASE(Fetch_Document_History)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content {
+        '0','1','2','3','4','5','6','7','8','9',
+        '0','1','2','3','4','5','6','7','8','9',
+        '0','1','2','3','4','5','6','7','8','9',
+    };
+    
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Storage.Save(Header, Content, "willi");
+
+    const Access::BinaryData NewContent {
+        '0','1','2','3','4','5','6','7','8','9',
+        '9','8','7','6','5','4','3','2','1','0',
+        '0','1','2','3','4','5','6','7','8','9',
+    };
+
+    Storage.Save(Header, NewContent, "willi");
+    auto Entries = Storage.Revisions(Header->Id);
+    
+    BOOST_CHECK(Entries.size() == 2);
+}
