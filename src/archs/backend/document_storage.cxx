@@ -62,8 +62,9 @@ DocumentStorage::DocumentStorage(const SettingsProvider& settings)
 : Settings_(settings), Timer_(hours(3), boost::bind(&DocumentStorage::Optimizer, this))
 {
     InitializeBuckets();
-    RegisterTransformers();
     auto& Builder = async(launch::async, [this]() { BuildFolderTree(); });
+    RegisterTransformers();
+    Timer_.Start();
     Builder.wait();
 }
 
@@ -730,6 +731,35 @@ void DocumentStorage::Delete(const string& id, const string& user) const
     Actions.Insert(*History);
     
     Actions.Flush();
+    FolderInfo.wait();
+}
+
+void DocumentStorage::Destroy(const string& id, const string& user) const
+{
+    ReadOnlyDenied(user);
+    
+    auto Handle = FetchBucket(id);
+    Guard Lock(Handle->WriteGuard);
+    
+    Access::DocumentDataPtr Document = Fetch(Handle, id);
+    if (Document->Locker.empty() == false && Document->Locker != user) throw Access::LockError((format("document %1% is locked by %2%") % Document->Display % Document->Locker).str());
+    if (Document->Deleted) throw Access::LockError((format("document %1% is already in the deleted state") % Document->Display).str());
+    
+    auto Folders = FoldersOf(id);
+    auto& FolderInfo = async(launch::async, [this, &Folders, &Document]() {
+         for (auto& Folder : Folders) {
+             if (Document->Name == Access::DocumentDirectoryName)
+                Folders_.RemoveUncounted(Folder);
+             else {
+                Folders_.Remove(Folder);
+             }
+         }
+    });
+    
+    TransformerQueue Actions(Handle->Writing());
+    Actions.Delete(*Document);
+    Actions.Flush();
+    
     FolderInfo.wait();
 }
 

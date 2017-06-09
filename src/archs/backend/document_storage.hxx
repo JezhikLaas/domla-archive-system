@@ -66,6 +66,7 @@ public:
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Link(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Associate(const std::string& id, const std::string& path, const std::string& item, const std::string& type, const std::string& user) const;
+    void Destroy(const std::string& id, const std::string& user) const;
     void Delete(const std::string& id, const std::string& user) const;
     void Undelete(const std::string& id, const std::string& user) const;
     void Undelete(const std::vector<std::string>& ids, const std::string& user) const;

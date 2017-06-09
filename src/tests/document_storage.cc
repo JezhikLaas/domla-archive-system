@@ -426,3 +426,25 @@ BOOST_AUTO_TEST_CASE(Erase_MetaData)
     auto Result = Storage.FindMetaData("InterneNummer=123");
     BOOST_CHECK(Result.size() == 0);
 }
+
+BOOST_AUTO_TEST_CASE(Destroy_Document)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    
+    Storage.Save(Header, Content, "willi");
+    Storage.Destroy(Header->Id, "willi");
+    
+    bool NotFound = false;
+    try {
+        Header = Storage.Load(Header->Id, "willi");
+    }
+    catch (Access::NotFoundError&) {
+        NotFound = true;
+    }
+
+    BOOST_CHECK(NotFound);
+}
