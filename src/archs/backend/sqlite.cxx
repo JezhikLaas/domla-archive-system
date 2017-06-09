@@ -473,12 +473,12 @@ bool ResultSet::HasData() const
     return Inner->Data;
 }
 
-ResultSet::iterator ResultSet::begin()
+ResultSet::iterator ResultSet::begin() const
 {
     return iterator(this, Inner->Data == false);
 }
 
-ResultSet::iterator ResultSet::end()
+ResultSet::iterator ResultSet::end() const
 {
     return iterator();
 }

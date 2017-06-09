@@ -75,6 +75,8 @@ public:
     void ReplaceMetaData(const std::string& id, const std::string& data, const std::string& user) const;
     std::vector<std::string> ListMetaTags() const;
     std::vector<std::string> ListMetaTags(const std::string& id) const;
+    Access::DocumentContentPtr Read(const std::string& id, const std::string& user) const;
+    Access::DocumentContentPtr Read(const std::string& id, const std::string& user, int revision) const;
 };
 
 } // Backend

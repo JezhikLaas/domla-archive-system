@@ -137,8 +137,8 @@ public:
             const ResultRow& dereference() const;
     };
 
-    iterator begin();
-    iterator end();
+    iterator begin() const;
+    iterator end() const;
     int Fields() const;
     bool HasData() const;
 };

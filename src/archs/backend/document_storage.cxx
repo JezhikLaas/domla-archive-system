@@ -845,6 +845,63 @@ void DocumentStorage::Undelete(const string& id, const string& user) const
     FolderInfo.wait();
 }
 
+Access::DocumentContentPtr DocumentStorage::Read(const string& id, const string& user) const
+{
+    auto& Handle = FetchBucket(id);
+    auto Content = LatestContent(Handle->Reading(), id);
+
+    return Content;
+}
+
+Access::DocumentContentPtr DocumentStorage::Read(const string& id, const string& user, int revision) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    %1%
+FROM
+    DocumentContents cnt
+INNER JOIN
+    DocumentHistories hst
+ON
+    cnt.Owner = hst.Id
+WHERE
+    hst.Owner = '%2%'
+ORDER BY
+    cnt.SeqId DESC)";
+    
+    auto& Handle = FetchBucket(id);
+    Guard Lock(Handle->ReadGuard);
+    auto Header = FetchChecked(Handle, id, user);
+
+    auto Fields = AliasFields(ContentTransformer::FieldNames(), "cnt");
+    auto Query = (format(QueryTemplate) % Fields % id).str();
+    auto Command = Handle->Reading()->Create(Query);
+    
+    Access::DocumentContentPtr Last = new Access::DocumentContent();
+    vector<unsigned char> Content;
+
+    ContentTransformer Transformer;
+    for (auto& Row : Command.Open()) {
+        Transformer.Load(Row, *Last);
+        if (Content.empty()) {
+            Content = Last->Content;
+        }
+        else {
+            if (Last->Revision < revision) break;
+            Content = BinaryData::ApplyPatch(Content, Last->Content);
+        }
+    }
+
+    Access::DocumentContentPtr Result = new Access::DocumentContent();
+    Result->Checksum = Last->Checksum;
+    Result->Content = Content;
+    Result->History = Last->History;
+    Result->Id = Last->Id;
+    Result->Revision = Last->Revision;
+    
+    return Result;
+}
+
 void DocumentStorage::InitializeBuckets()
 {
     if (Settings_.DataLocation() != ":memory:") create_directory(Settings_.DataLocation());
