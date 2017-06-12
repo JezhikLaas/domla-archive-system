@@ -101,7 +101,8 @@ END;
 void DocumentSchema::Ensure(const SQLite::Connection& connection)
 {
     for (auto& Sql : SchemaCommand) {
-        auto Command = connection.Create(Sql);
+		string SqlText(Sql);
+        auto Command = connection.Create(SqlText);
         Command.Execute();
     }
 }

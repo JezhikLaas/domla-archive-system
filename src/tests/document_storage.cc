@@ -242,21 +242,23 @@ BOOST_AUTO_TEST_CASE(Copy_Document)
 {
     OneBucketProvider Settings;
     DocumentStorage Storage(Settings);
-    
+	string Id;
     const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
-    Access::DocumentDataPtr Header = new Access::DocumentData();
-    Header->FolderPath = "/one";
-    Header->Name = "test.xxx";
-    Header->Display = "Testing";
-    
-    Storage.Save(Header, Content, "willi");
-    Storage.Copy(Header->Id, "/one", "/two", "willi");
-    
+	{
+		Access::DocumentDataPtr Header = new Access::DocumentData();
+		Header->FolderPath = "/one";
+		Header->Name = "test.xxx";
+		Header->Display = "Testing";
+
+		Storage.Save(Header, Content, "willi");
+		Storage.Copy(Header->Id, "/one", "/two", "willi");
+		Id = Header->Id;
+	}
     auto Check = Storage.FindTitle("/two", "Testing");
 
     BOOST_CHECK(Check.empty() == false);
     BOOST_CHECK(Check[0]->Id.empty() == false);
-    BOOST_CHECK(Check[0]->Id != Header->Id);
+    BOOST_CHECK(Check[0]->Id != Id);
 }
 
 BOOST_AUTO_TEST_CASE(Link_Document)
@@ -542,4 +544,42 @@ BOOST_AUTO_TEST_CASE(Rename_Documents)
     Header = Storage.Load(Header->Id, "willi");
 
     BOOST_CHECK(Header->Display == "Zwei");
+}
+
+BOOST_AUTO_TEST_CASE(Find_Document_By_Filename)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    Header->Display = "Testing";
+    
+    Storage.Save(Header, Content, "willi");
+    
+    auto Check = Storage.FindFilenames("test.xxx");
+
+    BOOST_CHECK(Check.empty() == false);
+    BOOST_CHECK(Check[0]->Id.empty() == false);
+}
+
+BOOST_AUTO_TEST_CASE(Find_Document_By_Regex)
+{
+    OneBucketProvider Settings;
+    DocumentStorage Storage(Settings);
+    
+    const Access::BinaryData Content { 3, 2, 1, 0, 1, 2, 3 };
+    Access::DocumentDataPtr Header = new Access::DocumentData();
+    Header->FolderPath = "/one";
+    Header->Name = "test.xxx";
+    Header->Display = "Testing";
+    
+    Storage.Save(Header, Content, "willi");
+    
+    auto Check = Storage.FindFilenameMatch("[^.]+\\.xxx");
+
+    BOOST_CHECK(Check.empty() == false);
+    BOOST_CHECK(Check[0]->Id.empty() == false);
 }

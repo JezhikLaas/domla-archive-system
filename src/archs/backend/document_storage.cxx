@@ -403,35 +403,8 @@ WHERE
     asg.Path = '%1%' AND lower(doc.DisplayName) = lower('%2%') AND doc.State = 0
 )";
     auto Query = (format(QueryTemplate) % algorithm::to_lower_copy(folderPath) % boost::algorithm::to_lower_copy(displayName)).str();
-    vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
     
-    for (auto& Handle : DistinctHandles_) {
-        Intermediates.push_back(
-            async(
-                [&Handle, &Query]() {
-                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
-                    auto& Command = Handle->Reader().Create(Query);
-                    vector<Access::DocumentDataPtr> Items;
-                    for (auto& Row : Command.Open()) {
-                        Access::DocumentDataPtr Item = new Access::DocumentData();
-                        FillHeaderFromRow(Item, Row);
-                        Items.push_back(Item);
-                    }
-                    
-                    return Items;
-                }
-            )
-        );
-    }
-    
-    vector<Access::DocumentDataPtr> Result;
-    
-    for (auto& Found : Intermediates) {
-        auto Items = Found.get();
-        for(auto Item : Items) Result.push_back(Item);
-    }
-    
-    return Result;
+    return FetchFromAll(Query);
 }
 
 vector<Access::DocumentDataPtr> DocumentStorage::FindKeywords(const string& keywords) const
@@ -456,35 +429,7 @@ WHERE
     auto Restrict = join(Parts, " OR ");
     auto Query = (format(QueryTemplate) % Restrict).str();
     
-    vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
-    
-    for (auto& Handle : DistinctHandles_) {
-        Intermediates.push_back(
-            async(
-                [&Handle, &Query]() {
-                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
-                    auto& Command = Handle->Reader().Create(Query);
-                    vector<Access::DocumentDataPtr> Items;
-                    for (auto& Row : Command.Open()) {
-                        Access::DocumentDataPtr Item = new Access::DocumentData();
-                        FillHeaderFromRow(Item, Row);
-                        Items.push_back(Item);
-                    }
-                    
-                    return Items;
-                }
-            )
-        );
-    }
-    
-    vector<Access::DocumentDataPtr> Result;
-    
-    for (auto& Found : Intermediates) {
-        auto Items = Found.get();
-        for(auto Item : Items) Result.push_back(Item);
-    }
-    
-    return Result;
+    return FetchFromAll(Query);
 }
 
 vector<Access::DocumentDataPtr> DocumentStorage::FindMetaData(const string& tags) const
@@ -511,35 +456,53 @@ WHERE
     auto Restrict = join(Parts, " AND ");
     auto Query = (format(QueryTemplate) % Restrict).str();
     
-    vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
+    return FetchFromAll(Query);
+}
+
+vector<Access::DocumentDataPtr> DocumentStorage::FindFilenames(const string& names) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+WHERE
+    (%1%) AND doc.State = 0
+)";
+    auto Values = Utils::Split(names, ' ');
+    vector<string> Parts;
+    transform(Values.begin(), Values.end(), back_inserter(Parts), [](const string& word) { return "doc.FileName LIKE '%" + word + "%'"; });
+    auto Restrict = join(Parts, " OR ");
+    auto Query = (format(QueryTemplate) % Restrict).str();
     
-    for (auto& Handle : DistinctHandles_) {
-        Intermediates.push_back(
-            async(
-                [&Handle, &Query]() {
-                    lock_guard<recursive_mutex> Lock(Handle->ReadGuard);
-                    auto& Command = Handle->Reader().Create(Query);
-                    vector<Access::DocumentDataPtr> Items;
-                    for (auto& Row : Command.Open()) {
-                        Access::DocumentDataPtr Item = new Access::DocumentData();
-                        FillHeaderFromRow(Item, Row);
-                        Items.push_back(Item);
-                    }
-                    
-                    return Items;
-                }
-            )
-        );
-    }
+    return FetchFromAll(Query);
+}
+
+vector<Access::DocumentDataPtr> DocumentStorage::FindFilenameMatch(const string& expression) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+WHERE
+    (FileName REGEXP '%1%') AND doc.State = 0
+)";
+    auto Query = (format(QueryTemplate) % expression).str();
     
-    vector<Access::DocumentDataPtr> Result;
-    
-    for (auto& Found : Intermediates) {
-        auto Items = Found.get();
-        for(auto Item : Items) Result.push_back(Item);
-    }
-    
-    return Result;
+    return FetchFromAll(Query);
 }
 
 void DocumentStorage::Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)
@@ -1311,4 +1274,42 @@ void DocumentStorage::Optimizer()
     }
     
     for (auto& Action : Actions) Action.wait();
+}
+
+vector<Access::DocumentDataPtr> DocumentStorage::FetchFromAll(const string& query) const
+{
+    vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
+    DocumentTransformer Transformer;
+    
+    for (auto Handle : DistinctHandles_) {
+        Intermediates.push_back(
+            async(
+				launch::async,
+                [handle = Handle, query = query, transformer = Transformer]() {
+                    Guard Lock(handle->ReadGuard);
+                    auto Command = handle->Reader().Create(query);
+                    vector<Access::DocumentDataPtr> Items;
+                    auto ResultSet = Command.Open();
+                    for (auto& Row : ResultSet) {
+                        Access::DocumentDataPtr Item = new Access::DocumentData();
+                        transformer.Load(Row, *Item);
+                        Items.push_back(Item);
+                    }
+                    
+                    return Items;
+                }
+            )
+        );
+    }
+    
+    vector<Access::DocumentDataPtr> Result;
+    
+    for (auto& Found : Intermediates) {
+        auto Items = Found.get();
+        for(auto& Item : Items) Result.push_back(Item);
+    }
+    
+    Intermediates.clear();
+    
+    return Result;
 }

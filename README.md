@@ -11,3 +11,4 @@ External requirements
 - zeroc ICE
 - boost
 - xapian
+- icu

@@ -15,13 +15,17 @@ namespace
 
 int CheckAndThrow(int code, sqlite3* handle, int line, const char* file)
 {
-    if (code != SQLITE_OK) throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+	if (code != SQLITE_OK) {
+		throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+	}
     return code;
 }
 
 int CheckAndThrow(int code, const initializer_list<int>& accepted, sqlite3* handle, int line, const char* file)
 {
-    if (count(accepted.begin(), accepted.end(), code) == 0) throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+	if (count(accepted.begin(), accepted.end(), code) == 0) {
+		throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+	}
     return code;
 }
 
@@ -33,15 +37,26 @@ int CheckAndThrow(int code, const initializer_list<int>& accepted, sqlite3* hand
 
 struct Connection::Implementation
 {
-    Implementation(Configuration configuration)
+#ifdef _DEBUG
+	static int ActiveConnections;
+#endif
+	
+	Implementation(Configuration configuration)
     : Handle(nullptr), Setup(configuration)
-    { }
+    {
+#ifdef _DEBUG
+		++ActiveConnections;
+#endif
+	}
     
     ~Implementation()
     {
         if (Handle != nullptr) sqlite3_close(Handle);
         Handle = nullptr;
-    }
+#ifdef _DEBUG
+		--ActiveConnections;
+#endif
+	}
     
     sqlite3* Handle;
     Configuration Setup;
@@ -189,15 +204,15 @@ struct Connection::Implementation
                     Mode = "off";
                     break;
             }
-            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA journal_mode=") + Mode).c_str(), nullptr, nullptr, nullptr), Handle);
+			string Command = "PRAGMA journal_mode=";
+			Command += Mode;
+            CHECK_AND_THROW(sqlite3_exec(Handle, Command.c_str(), nullptr, nullptr, nullptr), Handle);
             Modified = true;
         }
         if (Setup.TransactionIsolation != Current.TransactionIsolation) {
-            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA read_uncommitted=") + (Setup.TransactionIsolation == Configuration::IsolationLevel::ReadUncommitted ? "1" : "0")).c_str(), nullptr, nullptr, nullptr), Handle);
-            Modified = true;
-        }
-        if (Setup.TransactionIsolation != Current.TransactionIsolation) {
-            CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA read_uncommitted=") + (Setup.TransactionIsolation == Configuration::IsolationLevel::ReadUncommitted ? "1" : "0")).c_str(), nullptr, nullptr, nullptr), Handle);
+			string Command = "PRAGMA read_uncommitted=";
+			Command += Setup.TransactionIsolation == Configuration::IsolationLevel::ReadUncommitted ? "1" : "0";
+            CHECK_AND_THROW(sqlite3_exec(Handle, Command.c_str(), nullptr, nullptr, nullptr), Handle);
             Modified = true;
         }
     }
@@ -245,6 +260,10 @@ struct Connection::Implementation
     }
 };
 
+#ifdef _DEBUG
+int Connection::Implementation::ActiveConnections = 0;
+#endif
+
 struct ResultSet::Implementation
 {
     Implementation(sqlite3_stmt* statement, bool data)
@@ -257,16 +276,30 @@ struct ResultSet::Implementation
 
 struct Command::Implementation
 {
+#ifdef _DEBUG
+	static int ActiveCommands;
+#endif
+
     Implementation(Command& owner)
     : Owner(owner), Handle(nullptr), Parameters(ParameterList)
-    { }
+    {
+#ifdef _DEBUG
+		++ActiveCommands;
+#endif
+	}
     
     ~Implementation()
     {
         if (Handle != nullptr) sqlite3_finalize(Handle);
         Handle = nullptr;
-    }
-    
+#ifdef _DEBUG
+		--ActiveCommands;
+#endif
+	}
+
+	Implementation(const Implementation& other) = delete;
+	void operator=(const Implementation& other) = delete;
+
     Command& Owner;
     sqlite3_stmt* Handle;
     vector<Parameter> ParameterList;
@@ -353,6 +386,10 @@ struct Command::Implementation
         return ResultSet(Owner, HasRow);
     }
 };
+
+#ifdef _DEBUG
+int Command::Implementation::ActiveCommands = 0;
+#endif
 
 struct Transaction::Implementation
 {

@@ -43,6 +43,7 @@ private:
     Access::DocumentContentPtr LatestContent(SQLite::Connection* connection, const std::string& id) const;
     Access::DocumentAssignmentPtr Fetch(SQLite::Connection* connection, const std::string& id, const std::string& path) const;
     void Optimizer();
+    std::vector<Access::DocumentDataPtr> DocumentStorage::FetchFromAll(const std::string& query) const;
     
 public:
     DocumentStorage(const SettingsProvider& settings);
@@ -62,6 +63,8 @@ public:
     std::vector<Access::DocumentDataPtr> FindKeywords(const std::string& keywords) const;
     std::vector<Access::DocumentDataPtr> FindTitle(const std::string& folderPath, const std::string& displayName) const;
     std::vector<Access::DocumentDataPtr> FindMetaData(const std::string& tags) const;
+    std::vector<Access::DocumentDataPtr> FindFilenames(const std::string& names) const;
+    std::vector<Access::DocumentDataPtr> FindFilenameMatch(const std::string& expression) const;
     void Move(const std::string& id, const std::string& oldPath, const std::string& newPath, const std::string& user) const;
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Link(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;

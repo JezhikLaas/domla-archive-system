@@ -3,10 +3,11 @@ cmake_minimum_required(VERSION 3.8)
 project("Domla Archive")
 
 enable_testing()
+find_package(ICU)
 find_package(Ice)
 find_package(Boost)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/lib ${CMAKE_CURRENT_SOURCE_DIR}/src/archs/backend/bzip2-1.0.5 $ENV{XAPIAN_HOME}/include ${Ice_INCLUDE_DIR} SYSTEM ${Boost_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/lib ${CMAKE_CURRENT_SOURCE_DIR}/src/archs/backend/bzip2-1.0.5 $ENV{XAPIAN_HOME}/include ${Ice_INCLUDE_DIR} ${ICU_INCLUDE_DIR} SYSTEM ${Boost_INCLUDE_DIRS})
 file(GLOB TEST_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/tests/*.cc)
 
 add_custom_command(
@@ -16,7 +17,7 @@ add_custom_command(
 )
 
 if (WIN32)
-    link_directories(${Ice_INCLUDE_DIR}/../lib/vc140 ${Boost_INCLUDE_DIRS}/lib32-msvc-14.0)
+    link_directories(${Ice_INCLUDE_DIR}/../lib/vc140 ${Boost_INCLUDE_DIRS}/lib32-msvc-14.0 ${Ice_INCLUDE_DIR}/../lib)
 endif (WIN32)
 
 add_library(
@@ -50,8 +51,16 @@ add_library(
 
 target_compile_definitions(
     sqlitelib
-    PUBLIC SQLITE_THREADSAFE=2 SQLITE_DEFAULT_MEMSTATUS=0 SQLITE_ENABLE_FTS5
+    PUBLIC SQLITE_THREADSAFE=2 SQLITE_DEFAULT_MEMSTATUS=0 SQLITE_ENABLE_FTS5 SQLITE_ENABLE_ICU
 )
+
+if (WIN32)
+    target_link_libraries(
+        sqlitelib
+        ${ICU_INCLUDE_DIR}/../lib/icuucd.lib
+        ${ICU_INCLUDE_DIR}/../lib/icuind.lib
+    )
+endif (WIN32)
 
 add_library(
     bzip2lib STATIC
