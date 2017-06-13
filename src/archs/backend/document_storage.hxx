@@ -10,14 +10,18 @@
 #include "Archive.h"
 #include "utils.hxx"
 
-namespace Archive
+namespace Archive /*! Everything is in the Archive namespace */
 {
-namespace Backend
+namespace Backend /*! Backend ist the server side */
 {
 
 using BucketHandle = std::shared_ptr<DataBucket>;
 using CreateHandle = std::function<BucketHandle(int)>;
 
+/*!
+ * Implements the 'real' archive operations as commands
+ * executed against the underlying SQLite databases.
+ */
 class DocumentStorage
 {
 private:
@@ -46,14 +50,53 @@ private:
     std::vector<Access::DocumentDataPtr> DocumentStorage::FetchFromAll(const std::string& query) const;
     
 public:
-    DocumentStorage(const SettingsProvider& settings);
+    /*!
+     * Constructs the storage logic.
+     * \param settings Configuration for the storage.
+     */
+    explicit DocumentStorage(const SettingsProvider& settings);
+    
+    /*!
+     * Shutdown the storage, release all resources.
+     */
     ~DocumentStorage();
+    
+    /*! Copy construction not allowed. */
     DocumentStorage(const DocumentStorage&) = delete;
+    
+    /*! Assignment not allowed. */
     void operator= (const DocumentStorage&) = delete;
 
 public:
+    /*! \brief Folder infos for given path.
+     *
+     * Read the folder informations for the given path and its
+     * subfolders.
+     * \param root Folder to start with, may be empty which is equal to root.
+     * \return List of qualified folder names an the count of contained documents.
+     */
     std::vector<Access::FolderInfo> FoldersForPath(const std::string& root) const;
+    
+    /*! \brief Folders of a document
+     *
+     * Since a document can be linked into multiple folders,
+     * it is possible to have multiple paths where a document
+     * can be found. Not that passing an unknown document id
+     * will not throw but return an empty list.
+     * \param id Id of document to retrieve path infos for.
+     * \return List of path names, root based.
+     */
     std::vector<std::string> FoldersOf(const std::string& id) const;
+    
+    /*! \brief Load minimal header.
+     *
+     * Fetch the minimal header information for a given id.
+     * This command reads only the parts of the document header
+     * which consists of the fields of the header table.
+     * \param id Id of a known document.
+     * \param user Login of requesting user.
+     * \exception Access::NotFoundError If the given id is not known.
+     */
     Access::DocumentDataPtr Load(const std::string& id, const std::string& user) const;
     void Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const std::string& user, const std::string& comment = "");
     void Lock(const std::string& id, const std::string& user) const;

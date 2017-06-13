@@ -400,7 +400,7 @@ INNER JOIN
 INNER JOIN
     DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
 WHERE
-    asg.Path = '%1%' AND lower(doc.DisplayName) = lower('%2%') AND doc.State = 0
+    asg.Path = '%1%' AND lower(doc.DisplayName) = '%2%' AND doc.State = 0
 )";
     auto Query = (format(QueryTemplate) % algorithm::to_lower_copy(folderPath) % boost::algorithm::to_lower_copy(displayName)).str();
     
@@ -1281,13 +1281,13 @@ vector<Access::DocumentDataPtr> DocumentStorage::FetchFromAll(const string& quer
     vector<future<vector<Access::DocumentDataPtr>>> Intermediates;
     DocumentTransformer Transformer;
     
-    for (auto Handle : DistinctHandles_) {
+    for (auto& Handle : DistinctHandles_) {
         Intermediates.push_back(
             async(
 				launch::async,
                 [handle = Handle, query = query, transformer = Transformer]() {
                     Guard Lock(handle->ReadGuard);
-                    auto Command = handle->Reader().Create(query);
+                    SQLite::Command Command(handle->Reader().Create(query));
                     vector<Access::DocumentDataPtr> Items;
                     auto ResultSet = Command.Open();
                     for (auto& Row : ResultSet) {

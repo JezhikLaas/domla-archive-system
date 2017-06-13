@@ -78,7 +78,7 @@ public:
 
     iterator begin() const { return iterator(Parameters_.begin()); }
     iterator end() const { return iterator(Parameters_.end()); }
-    Parameter& operator[](const std::string key) const;
+    Parameter& operator[](const std::string& key) const;
 };
 
 class ResultRow

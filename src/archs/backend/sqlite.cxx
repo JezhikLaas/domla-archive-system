@@ -307,7 +307,10 @@ struct Command::Implementation
     
     void Prepare(sqlite3* handle, const string& sql)
     {
-        CHECK_AND_THROW(sqlite3_prepare_v2(
+		if (Handle != nullptr) sqlite3_finalize(Handle);
+		Handle = nullptr;
+		
+		CHECK_AND_THROW(sqlite3_prepare_v2(
             handle,
             sql.c_str(),
             -1,
@@ -410,7 +413,7 @@ void Parameter::SetRawValue(const void* data, int size)
     RawSize_ = size;
 }
 
-Parameter& ParameterSet::operator[](const std::string key) const
+Parameter& ParameterSet::operator[](const std::string& key) const
 {
     auto Result = find_if(
         Parameters_.begin(),
@@ -537,9 +540,7 @@ const ResultRow& ResultSet::iterator::dereference() const
 
 Command::Command(const string& sql)
 : Inner(new Command::Implementation(*this))
-{
-    
-}
+{ }
 
 Command::Command(Command&& other)
 : Inner(nullptr)

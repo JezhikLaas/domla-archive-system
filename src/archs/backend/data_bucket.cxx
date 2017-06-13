@@ -29,9 +29,17 @@ DataBucket::DataBucket(int id, const SettingsProvider& settings)
     Write = make_unique<SQLite::Connection>(Setup);
     Write->OpenAlways();
     DocumentSchema::Ensure(Writer());
+    {
+        auto Command = Write->Create("PRAGMA cell_size_check = on");
+        Command.Execute();
+    }
     
     Setup.ReadOnly = true;
 
     Read = make_unique<SQLite::Connection>(Setup);
     Read->Open();
+    {
+        auto Command = Read->Create("PRAGMA cell_size_check = on");
+        Command.Execute();
+    }
 }

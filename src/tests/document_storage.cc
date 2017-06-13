@@ -1,3 +1,4 @@
+#define BOOST_TEST_DETECT_MEMORY_LEAK 0
 #define BOOST_TEST_MODULE "DocumentStorageModule"
 
 #include <boost/test/unit_test.hpp>
