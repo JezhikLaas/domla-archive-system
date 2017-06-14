@@ -505,6 +505,32 @@ WHERE
     return FetchFromAll(Query);
 }
 
+vector<Access::DocumentDataPtr> DocumentStorage::FindDeleted(const string& root, int depth) const
+{
+    const string QueryTemplate =
+R"(SELECT
+    doc.Id, doc.Creator, doc.Created, doc.FileName, doc.DisplayName, doc.State, doc.Locker, doc.Keywords, doc.Size, asg.AssignmentType, asg.AssignmentId, asg.Path, hsv.SeqId, hsv.Created
+FROM
+    DocumentAssignments asg
+INNER JOIN
+    DocumentHistories hst ON asg.Owner = hst.Id AND asg.SeqId = hst.SeqId
+INNER JOIN
+    Documents doc ON hst.Owner = doc.Id
+INNER JOIN
+    DocumentHistories hsv ON hsv.SeqId = (SELECT MAX(hsi.SeqId) FROM DocumentHistories hsi WHERE hsi.Owner = doc.Id) AND hsv.Owner = doc.Id
+WHERE
+    asg.Path LIKE lower('%1%%%')
+AND
+    doc.State = 1
+AND
+    PARTSCOUNT(asg.Path, '/') - %2% <= %3%
+)";
+    auto Difference = depth == LONG_MAX ? 0 : Utils::Split(root, '/').size();
+    auto Query = (format(QueryTemplate) % root % Difference % depth).str();
+    
+    return FetchFromAll(Query);
+}
+
 void DocumentStorage::Save(const Access::DocumentDataPtr& document, const Access::BinaryData& data, const string& user, const string& comment)
 {
     if (document->Id.empty()) {

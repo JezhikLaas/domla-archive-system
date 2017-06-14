@@ -107,7 +107,24 @@ public:
     std::vector<Access::DocumentDataPtr> FindTitle(const std::string& folderPath, const std::string& displayName) const;
     std::vector<Access::DocumentDataPtr> FindMetaData(const std::string& tags) const;
     std::vector<Access::DocumentDataPtr> FindFilenames(const std::string& names) const;
+    
+    /*! \brief Finds matching documents.
+     *
+     * Search documents by applying the given regular expression to
+     * the filenames of the stored documents.
+     * \param expression Regular expression to be used.
+     * \return The list of found documents, empty if none.
+     */
     std::vector<Access::DocumentDataPtr> FindFilenameMatch(const std::string& expression) const;
+    
+    /*! \brief Finds deleted documents.
+     *
+     * Scans a given folder path for deleted documents.
+     * \param root Folder to start the search.
+     * \param depth Count of subfolder levels to scan, use LONG_MAX for unlimited.
+     * \return The list of found deleted documents, empty if none.
+     */
+    std::vector<Access::DocumentDataPtr> FindDeleted(const std::string& root, int depth) const;
     void Move(const std::string& id, const std::string& oldPath, const std::string& newPath, const std::string& user) const;
     void Copy(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;
     void Link(const std::string& id, const std::string& sourcePath, const std::string& targetPath, const std::string& user) const;

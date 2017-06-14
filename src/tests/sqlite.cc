@@ -560,3 +560,45 @@ BOOST_AUTO_TEST_CASE(Non_Default_Configuration)
   auto Target = Con.CreateFree("CREATE TABLE a(one INT, two INT)");
   Target->Execute();
 }
+
+BOOST_AUTO_TEST_CASE(PartsCount_Detects_One_Part)
+{
+  Configuration Setup;
+  Setup.Path = ":memory:";
+  
+  Connection Con(Setup);
+  Con.OpenNew();
+  
+  auto Target = Con.Create("SELECT PARTSCOUNT('/one/', '/')");
+  auto Result = Target.ExecuteScalar<int>();
+
+  BOOST_CHECK(Result == 1);
+}
+
+BOOST_AUTO_TEST_CASE(PartsCount_Detects_Two_Parts)
+{
+  Configuration Setup;
+  Setup.Path = ":memory:";
+  
+  Connection Con(Setup);
+  Con.OpenNew();
+  
+  auto Target = Con.Create("SELECT PARTSCOUNT('/one/two', '/')");
+  auto Result = Target.ExecuteScalar<int>();
+
+  BOOST_CHECK(Result == 2);
+}
+
+BOOST_AUTO_TEST_CASE(PartsCount_Tolerates_No_Parts)
+{
+  Configuration Setup;
+  Setup.Path = ":memory:";
+  
+  Connection Con(Setup);
+  Con.OpenNew();
+  
+  auto Target = Con.Create("SELECT PARTSCOUNT('//', '/')");
+  auto Result = Target.ExecuteScalar<int>();
+
+  BOOST_CHECK(Result == 0);
+}

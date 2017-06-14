@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <initializer_list>
+#include <unordered_map>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
@@ -12,6 +13,55 @@ using namespace Archive::Backend::SQLite;
 
 namespace
 {
+    
+extern "C"
+void PartsCount(sqlite3_context* context, int countOfArguments, sqlite3_value** arguments)
+{
+    if (countOfArguments != 2) {
+        sqlite3_result_error(context, "PARTSCOUNT expects two strings", -1);
+        return;
+    }
+    
+    auto Value = sqlite3_value_text(arguments[0]);
+    auto Separator = sqlite3_value_text(arguments[1]);
+    auto Length = strlen(reinterpret_cast<const char*>(Value));
+    auto SeparatorLength = strlen(reinterpret_cast<const char*>(Separator));
+    
+    if (SeparatorLength == 0) {
+        sqlite3_result_error(context, "PARTSCOUNT, separator must not be empty", -1);
+        return;
+    }
+    
+    int Found = 0;
+    unsigned SeparatorIndex = 0;
+    bool InPart = false;
+
+    for (unsigned Index = 0; Index < Length; ++Index) {
+        unsigned SeparatorIndex = 0;
+        while (Index < Length && SeparatorIndex < SeparatorLength && Value[Index] == Separator[SeparatorIndex]) {
+            ++Index;
+            ++SeparatorIndex;
+        }
+        
+        // Input finished?
+        if (Index == Length) break;
+        
+        // Separator completed
+        if (SeparatorIndex == SeparatorLength) {
+            //Next part starts
+            InPart = false;
+            continue;
+        }
+        
+        // Already in part, don't count every character as match
+        if (InPart) continue;
+        
+        ++Found;
+        InPart = true;
+    }
+    
+    sqlite3_result_int(context, Found);
+}
 
 int CheckAndThrow(int code, sqlite3* handle, int line, const char* file)
 {
@@ -217,6 +267,21 @@ struct Connection::Implementation
         }
     }
     
+    void RegisterFunctions()
+    {
+        sqlite3_create_function_v2(
+            Handle,
+            "PARTSCOUNT",
+            2,
+            SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+            nullptr,
+            PartsCount,
+            nullptr,
+            nullptr,
+            nullptr
+        );
+    }
+    
     void Open()
     {
         auto Flags = Setup.ReadOnly
@@ -227,6 +292,7 @@ struct Connection::Implementation
                      
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle, Flags, nullptr), Handle);
         if (Setup.ReadOnly == false) ApplySetup();
+        RegisterFunctions();
     }
     
     void Create()
@@ -239,12 +305,14 @@ struct Connection::Implementation
         
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
         ApplySetup();
+        RegisterFunctions();
     }
     
     void CreateOrOpen()
     {
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
         ApplySetup();
+        RegisterFunctions();
     }
     
     void AlwaysCreate()
@@ -257,6 +325,7 @@ struct Connection::Implementation
         
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
         ApplySetup();
+        RegisterFunctions();
     }
 };
 

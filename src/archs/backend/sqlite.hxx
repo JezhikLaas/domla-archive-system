@@ -1,6 +1,7 @@
 #ifndef SQLITE_HXX
 #define SQLITE_HXX
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -12,12 +13,18 @@ namespace Archive
 {
 namespace Backend
 {
-namespace SQLite
+namespace SQLite /*! Minimalistic class wrappers for SQLite databases. */
 {
     
 class Command;
 class ResultSet;
 
+/*! \brief A parameter within an SQL statement.
+ *
+ * A parameter has a name and a value (which may be empty). Before
+ * executing a query the values from the associated parameters are
+ * extracted and assigned to the command.
+ */
 class Parameter
 {
 friend class Command;
@@ -32,14 +39,56 @@ private:
     explicit Parameter(const Command& owner, const std::string& realName, const std::string& name);
 
 public:
-    void SetName(const std::string& name) { Name_ = name; }
+    /*! \brief Name of this instance.
+     *
+     * The name is extracted from the SQL while preparing the statement.
+     * \return Name of the parameter.
+     */
     const std::string& Name() const { return Name_; }
+
+    /*! \brief Set the value for this instance.
+     *
+     * Several overloads are available, an unhandled type
+     * produces a compile error.
+     * \param value Value to assign.
+     */
     template <typename T>
     void SetValue(T&& value) { Value_ = value; }
+    
+    /*! \brief Set a blob value for this instance.
+     *
+     * This setter is specialized for setting blob data.
+     * \param value Value to assign.
+     * \param size Length of buffer in bytes.
+     */
     void SetRawValue(const void* data, int size);
+    
+    /*! \brief Read Value from instance.
+     *
+     * Use the boost any routines to fetch the 'real' value.
+     * \return Value of this.
+     */
     const boost::any& Value() const { return Value_; }
+    
+    /*! \brief Clear value of instance.
+     *
+     * Resets this instance to its default, which is empty.
+     */
     void Clear() { Value_ = boost::any(); }
+    
+    /*! \brief State of this.
+     *
+     * Empty is the default state.
+     * \return true if empty, false otherwise
+     */
     bool IsEmpty() const { return Value_.empty(); }
+    
+    /*! \brief Size of blob data.
+     *
+     * If this holds unspecified blob data, data length
+     * can bet fetched using this routine.
+     * \return Size of blob data or 0 if this contains no blob data.
+     */
     int RawSize() const { return RawSize_; }
 };
 
