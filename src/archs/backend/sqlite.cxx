@@ -13,7 +13,7 @@ using namespace Archive::Backend::SQLite;
 
 namespace
 {
-    
+
 extern "C"
 void PartsCount(sqlite3_context* context, int countOfArguments, sqlite3_value** arguments)
 {
@@ -21,17 +21,17 @@ void PartsCount(sqlite3_context* context, int countOfArguments, sqlite3_value** 
         sqlite3_result_error(context, "PARTSCOUNT expects two strings", -1);
         return;
     }
-    
+
     auto Value = sqlite3_value_text(arguments[0]);
     auto Separator = sqlite3_value_text(arguments[1]);
     auto Length = strlen(reinterpret_cast<const char*>(Value));
     auto SeparatorLength = strlen(reinterpret_cast<const char*>(Separator));
-    
+
     if (SeparatorLength == 0) {
         sqlite3_result_error(context, "PARTSCOUNT, separator must not be empty", -1);
         return;
     }
-    
+
     int Found = 0;
     unsigned SeparatorIndex = 0;
     bool InPart = false;
@@ -42,75 +42,75 @@ void PartsCount(sqlite3_context* context, int countOfArguments, sqlite3_value** 
             ++Index;
             ++SeparatorIndex;
         }
-        
+
         // Input finished?
         if (Index == Length) break;
-        
+
         // Separator completed
         if (SeparatorIndex == SeparatorLength) {
             //Next part starts
             InPart = false;
             continue;
         }
-        
+
         // Already in part, don't count every character as match
         if (InPart) continue;
-        
+
         ++Found;
         InPart = true;
     }
-    
+
     sqlite3_result_int(context, Found);
 }
 
 int CheckAndThrow(int code, sqlite3* handle, int line, const char* file)
 {
-	if (code != SQLITE_OK) {
-		throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
-	}
+    if (code != SQLITE_OK) {
+        throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+    }
     return code;
 }
 
 int CheckAndThrow(int code, const initializer_list<int>& accepted, sqlite3* handle, int line, const char* file)
 {
-	if (count(accepted.begin(), accepted.end(), code) == 0) {
-		throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
-	}
+    if (count(accepted.begin(), accepted.end(), code) == 0) {
+        throw sqlite_exception(sqlite3_errmsg(handle), code, line, file);
+    }
     return code;
 }
 
 #define CHECK_AND_THROW(op, handle) CheckAndThrow(op, handle, __LINE__, __FILE__)
 #define CHECKS_AND_THROW(op, list, handle) CheckAndThrow(op, list, handle, __LINE__, __FILE__)
 #define THROW(msg) throw sqlite_exception(msg, SQLITE_ERROR, __LINE__, __FILE__);
-    
+
 } // anonymous namespace
 
 struct Connection::Implementation
 {
 #ifdef _DEBUG
-	static int ActiveConnections;
+    static int ActiveConnections;
 #endif
-	
-	Implementation(Configuration configuration)
+
+    Implementation(Configuration configuration)
     : Handle(nullptr), Setup(configuration)
     {
 #ifdef _DEBUG
-		++ActiveConnections;
+    ++ActiveConnections;
 #endif
-	}
-    
+  }
+
     ~Implementation()
     {
         if (Handle != nullptr) sqlite3_close(Handle);
         Handle = nullptr;
 #ifdef _DEBUG
-		--ActiveConnections;
+    --ActiveConnections;
 #endif
-	}
-    
+  }
+
     sqlite3* Handle;
     Configuration Setup;
-    
+
     int ReadSingleInteger(const string& sql)
     {
         sqlite3_stmt* Statement = nullptr;
@@ -123,12 +123,12 @@ struct Connection::Implementation
                 nullptr
             ),
             Handle);
-            
+
             CHECKS_AND_THROW(sqlite3_step(Statement), { SQLITE_ROW }, Handle);
-            
+
             auto Result = sqlite3_column_int(Statement, 0);
             sqlite3_finalize(Statement);
-            
+
             return Result;
         }
         catch(...) {
@@ -136,7 +136,7 @@ struct Connection::Implementation
             throw;
         }
     }
-    
+
     string ReadSingleString(const string& sql)
     {
         sqlite3_stmt* Statement = nullptr;
@@ -149,12 +149,12 @@ struct Connection::Implementation
                 nullptr
             ),
             Handle);
-            
+
             CHECKS_AND_THROW(sqlite3_step(Statement), { SQLITE_ROW }, Handle);
-            
+
             auto Result = reinterpret_cast<const char*>(sqlite3_column_text(Statement, 0));
             sqlite3_finalize(Statement);
-            
+
             return Result;
         }
         catch(...) {
@@ -162,20 +162,20 @@ struct Connection::Implementation
             throw;
         }
     }
-    
+
     Configuration ReadCurrentSetup()
     {
         Configuration Result;
-        
+
         Result.BusyTimeout = ReadSingleInteger("PRAGMA busy_timeout");
         Result.CacheSize = ReadSingleInteger("PRAGMA cache_size");
         Result.ForeignKeys = ReadSingleInteger("PRAGMA foreign_keys") == 1;
         Result.MaxPageCount = ReadSingleInteger("PRAGMA max_page_count");
         Result.PageSize = ReadSingleInteger("PRAGMA page_size");
         Result.TransactionIsolation = ReadSingleInteger("PRAGMA read_uncommitted") == 0 ? Configuration::IsolationLevel::Serializable : Configuration::IsolationLevel::ReadUncommitted;
-        
+
         auto Journal = ReadSingleString("PRAGMA journal_mode");
-        
+
         if (Journal == "wal") {
             Result.Journal = Configuration::JournalMode::Wal;
         }
@@ -194,16 +194,16 @@ struct Connection::Implementation
         else {
             Result.Journal = Configuration::JournalMode::Off;
         }
-        
+
         return Result;
     }
-    
+
     void ApplySetup()
     {
         auto Modified = false;
         auto Current = ReadCurrentSetup();
         Current.Path = Setup.Path;
-        
+
         if (Setup.PageSize != Current.PageSize) {
             auto ResetMode = false;
             if (Current.Journal == Configuration::JournalMode::Wal) {
@@ -212,7 +212,7 @@ struct Connection::Implementation
             }
             CHECK_AND_THROW(sqlite3_exec(Handle, (string("PRAGMA page_size=") + to_string(Setup.PageSize)).c_str(), nullptr, nullptr, nullptr), Handle);
             CHECK_AND_THROW(sqlite3_exec(Handle, "VACUUM", nullptr, nullptr, nullptr), Handle);
-            
+
             if (ResetMode) CHECK_AND_THROW(sqlite3_exec(Handle, "PRAGMA journal_mode=wal", nullptr, nullptr, nullptr), Handle);
             Modified = true;
         }
@@ -254,19 +254,19 @@ struct Connection::Implementation
                     Mode = "off";
                     break;
             }
-			string Command = "PRAGMA journal_mode=";
-			Command += Mode;
+      string Command = "PRAGMA journal_mode=";
+      Command += Mode;
             CHECK_AND_THROW(sqlite3_exec(Handle, Command.c_str(), nullptr, nullptr, nullptr), Handle);
             Modified = true;
         }
         if (Setup.TransactionIsolation != Current.TransactionIsolation) {
-			string Command = "PRAGMA read_uncommitted=";
-			Command += Setup.TransactionIsolation == Configuration::IsolationLevel::ReadUncommitted ? "1" : "0";
+      string Command = "PRAGMA read_uncommitted=";
+      Command += Setup.TransactionIsolation == Configuration::IsolationLevel::ReadUncommitted ? "1" : "0";
             CHECK_AND_THROW(sqlite3_exec(Handle, Command.c_str(), nullptr, nullptr, nullptr), Handle);
             Modified = true;
         }
     }
-    
+
     void RegisterFunctions()
     {
         sqlite3_create_function_v2(
@@ -281,7 +281,7 @@ struct Connection::Implementation
             nullptr
         );
     }
-    
+
     void Open()
     {
         auto Flags = Setup.ReadOnly
@@ -289,12 +289,12 @@ struct Connection::Implementation
                      SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY
                      :
                      SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE;
-                     
+
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle, Flags, nullptr), Handle);
         if (Setup.ReadOnly == false) ApplySetup();
         RegisterFunctions();
     }
-    
+
     void Create()
     {
         if (Setup.Path.size() && Setup.Path[0] != ':') {
@@ -302,19 +302,19 @@ struct Connection::Implementation
             if (boost::filesystem::is_regular_file(FilePath)) THROW((boost::format("file %1% exists") % Setup.Path).str());
             if (boost::filesystem::is_directory(FilePath)) THROW((boost::format("directory %1% exists") % Setup.Path).str());
         }
-        
+
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
         ApplySetup();
         RegisterFunctions();
     }
-    
+
     void CreateOrOpen()
     {
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
         ApplySetup();
         RegisterFunctions();
     }
-    
+
     void AlwaysCreate()
     {
         if (Setup.Path.size() && Setup.Path[0] != ':') {
@@ -322,7 +322,7 @@ struct Connection::Implementation
             if (boost::filesystem::is_directory(FilePath)) THROW((boost::format("directory %1% exists") % Setup.Path).str());
             if (boost::filesystem::is_regular_file(FilePath)) boost::filesystem::remove(FilePath);
         }
-        
+
         CHECK_AND_THROW(sqlite3_open_v2(Setup.Path.c_str(), &Handle,  SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_CREATE, nullptr), Handle);
         ApplySetup();
         RegisterFunctions();
@@ -338,7 +338,7 @@ struct ResultSet::Implementation
     Implementation(sqlite3_stmt* statement, bool data)
     : Handle(statement), Data(data)
     { }
-    
+
     sqlite3_stmt* Handle;
     bool Data;
 };
@@ -346,40 +346,40 @@ struct ResultSet::Implementation
 struct Command::Implementation
 {
 #ifdef _DEBUG
-	static int ActiveCommands;
+    static int ActiveCommands;
 #endif
 
     Implementation(Command& owner)
     : Owner(owner), Handle(nullptr), Parameters(ParameterList)
     {
 #ifdef _DEBUG
-		++ActiveCommands;
+    ++ActiveCommands;
 #endif
-	}
-    
+  }
+
     ~Implementation()
     {
         if (Handle != nullptr) sqlite3_finalize(Handle);
         Handle = nullptr;
 #ifdef _DEBUG
-		--ActiveCommands;
+    --ActiveCommands;
 #endif
-	}
+    }
 
-	Implementation(const Implementation& other) = delete;
-	void operator=(const Implementation& other) = delete;
+    Implementation(const Implementation& other) = delete;
+    void operator=(const Implementation& other) = delete;
 
     Command& Owner;
     sqlite3_stmt* Handle;
     vector<Parameter> ParameterList;
     ParameterSet Parameters;
-    
+
     void Prepare(sqlite3* handle, const string& sql)
     {
-		if (Handle != nullptr) sqlite3_finalize(Handle);
-		Handle = nullptr;
-		
-		CHECK_AND_THROW(sqlite3_prepare_v2(
+        if (Handle != nullptr) sqlite3_finalize(Handle);
+        Handle = nullptr;
+
+        CHECK_AND_THROW(sqlite3_prepare_v2(
             handle,
             sql.c_str(),
             -1,
@@ -387,12 +387,12 @@ struct Command::Implementation
             nullptr
         ),
         handle);
-        
+
         for (int Index = 1; Index <= sqlite3_bind_parameter_count(Handle); ++Index) {
             ParameterList.push_back(Parameter(Owner, sqlite3_bind_parameter_name(Handle, Index), sqlite3_bind_parameter_name(Handle, Index) + 1));
         }
     }
-    
+
     void BindParameters()
     {
         for (auto& Item : ParameterList) {
@@ -416,7 +416,7 @@ struct Command::Implementation
                 sqlite3_bind_text(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), Buffer.c_str(), -1, nullptr);
             }
             else if (Item.Value().type() == typeid(vector<unsigned char>)) {
-				auto& Buffer = boost::any_cast<const vector<unsigned char>&>(Item.Value_);
+                auto& Buffer = boost::any_cast<const vector<unsigned char>&>(Item.Value_);
                 const void* Pointer = Buffer.empty() ? nullptr : &Buffer[0];
                 sqlite3_bind_blob(Handle, sqlite3_bind_parameter_index(Handle, Item.RealName_.c_str()), Pointer, Buffer.size(), nullptr);
             }
@@ -428,31 +428,31 @@ struct Command::Implementation
             }
         }
     }
-    
+
     int ExecuteScalarInt()
     {
         BindParameters();
-        
+
         switch (CHECKS_AND_THROW(sqlite3_step(Handle), { SQLITE_ROW }, sqlite3_db_handle(Handle))) {
             case SQLITE_ROW:
                 return sqlite3_column_int(Handle, 0);
         }
-        
+
         return 0;
     }
-    
+
     void Execute()
     {
         BindParameters();
-        
+
         auto Accepted = { SQLITE_OK, SQLITE_DONE, SQLITE_ROW };
         CHECKS_AND_THROW(sqlite3_step(Handle), Accepted, sqlite3_db_handle(Handle));
     }
-    
+
     ResultSet Open()
     {
         BindParameters();
-        
+
         auto Accepted = { SQLITE_OK, SQLITE_DONE, SQLITE_ROW };
         auto HasRow = CHECKS_AND_THROW(sqlite3_step(Handle), Accepted, sqlite3_db_handle(Handle)) == SQLITE_ROW;
         return ResultSet(Owner, HasRow);
@@ -490,8 +490,8 @@ Parameter& ParameterSet::operator[](const std::string& key) const
         [&key](Parameter item) { return boost::algorithm::to_lower_copy(item.Name()) == boost::algorithm::to_lower_copy(key); }
     );
     if (Result == Parameters_.end()) throw runtime_error("key not found");
-    
-    return *Result;
+
+    return const_cast<Parameter&>(*Result);
 }
 
 int ResultRow::ColumnIndex(const std::string& name) const
@@ -499,7 +499,7 @@ int ResultRow::ColumnIndex(const std::string& name) const
     int Index = 0;
     while (_stricmp(name.c_str(), sqlite3_column_name(Owner_.Inner->Handle, Index)) && Index < sqlite3_column_count(Owner_.Inner->Handle)) ++Index;
     if (Index == sqlite3_column_count(Owner_.Inner->Handle)) throw runtime_error("key not found");
-    
+
     return Index;
 }
 
@@ -530,15 +530,15 @@ int64_t ResultRow::Get(int index) const
 template <>
 string ResultRow::Get(const std::string& name) const
 {
-	auto data = sqlite3_column_text(Owner_.Inner->Handle, ColumnIndex(name));
+    auto data = sqlite3_column_text(Owner_.Inner->Handle, ColumnIndex(name));
     return data != nullptr ? reinterpret_cast<const char*>(data) : "";
 }
 
 template <>
 string ResultRow::Get(int index) const
 {
-	auto data = sqlite3_column_text(Owner_.Inner->Handle, index);
-	return data != nullptr ? reinterpret_cast<const char*>(data) : "";
+    auto data = sqlite3_column_text(Owner_.Inner->Handle, index);
+    return data != nullptr ? reinterpret_cast<const char*>(data) : "";
 }
 
 vector<unsigned char> ResultRow::GetBlob(int index) const
@@ -546,7 +546,7 @@ vector<unsigned char> ResultRow::GetBlob(int index) const
     auto Size = sqlite3_column_bytes(Owner_.Inner->Handle, index);
     vector<unsigned char> Result((vector<unsigned char>::size_type)Size);
     if (Size) memcpy(&Result[0], sqlite3_column_blob(Owner_.Inner->Handle, index), Size);
-    
+
     return Result;
 }
 
@@ -591,7 +591,7 @@ ResultSet::iterator ResultSet::end() const
 {
     return iterator();
 }
-            
+
 void ResultSet::iterator::increment()
 {
     if (sqlite3_step(Owner_->Inner->Handle) == SQLITE_DONE) Done_ = true;
@@ -651,8 +651,7 @@ Transaction::Transaction()
 
 Connection::Connection(const Configuration& configuration)
 : Inner(new Connection::Implementation(configuration))
-{
-}
+{ }
 
 Connection::~Connection()
 {
@@ -707,7 +706,7 @@ Transaction::~Transaction()
         Rollback();
     }
     catch(...) { }
-    
+
     delete Inner;
     Inner = nullptr;
 }
@@ -731,6 +730,6 @@ Transaction Connection::Begin()
     Transaction Result;
     CHECK_AND_THROW(sqlite3_exec(Inner->Handle, "BEGIN", nullptr, nullptr, nullptr), Inner->Handle);
     Result.Inner->Handle = Inner->Handle;
-    
+
     return Result;
 }

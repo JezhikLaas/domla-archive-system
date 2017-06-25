@@ -15,7 +15,7 @@ namespace Backend
 {
 namespace SQLite /*! Minimalistic class wrappers for SQLite databases. */
 {
-    
+
 class Command;
 class ResultSet;
 
@@ -54,7 +54,7 @@ public:
      */
     template <typename T>
     void SetValue(T&& value) { Value_ = value; }
-    
+
     /*! \brief Set a blob value for this instance.
      *
      * This setter is specialized for setting blob data.
@@ -62,27 +62,27 @@ public:
      * \param size Length of buffer in bytes.
      */
     void SetRawValue(const void* data, int size);
-    
+
     /*! \brief Read Value from instance.
      *
      * Use the boost any routines to fetch the 'real' value.
      * \return Value of this.
      */
     const boost::any& Value() const { return Value_; }
-    
+
     /*! \brief Clear value of instance.
      *
      * Resets this instance to its default, which is empty.
      */
     void Clear() { Value_ = boost::any(); }
-    
+
     /*! \brief State of this.
      *
      * Empty is the default state.
      * \return true if empty, false otherwise
      */
     bool IsEmpty() const { return Value_.empty(); }
-    
+
     /*! \brief Size of blob data.
      *
      * If this holds unspecified blob data, data length
@@ -92,41 +92,46 @@ public:
     int RawSize() const { return RawSize_; }
 };
 
+/*! \brief The set of parameters of a command.
+ *
+ * The parameters are extracted automatically from the SQL
+ * string from which the command is constructed.
+ */
 class ParameterSet
 {
 private:
-    std::vector<Parameter>& Parameters_;
-    
+    const std::vector<Parameter>& Parameters_;
+
 public:
-    ParameterSet(std::vector<Parameter>& parameters)
+    ParameterSet(const std::vector<Parameter>& parameters)
     : Parameters_(parameters)
     { }
-    
-    class iterator : public boost::iterator_facade<iterator, Parameter, boost::random_access_traversal_tag>
+
+    class iterator : public boost::iterator_facade<iterator, const Parameter&, boost::random_access_traversal_tag>
     {
         public:
             iterator()
             { }
-        
-            iterator(std::vector<Parameter>::iterator position)
+
+            iterator(std::vector<Parameter>::const_iterator position)
             : Position_(position)
             { }
-        
+
         private:
             friend class boost::iterator_core_access;
-            
-            std::vector<Parameter>::iterator Position_;
+
+            std::vector<Parameter>::const_iterator Position_;
             void increment() { ++Position_; }
             void decrement() { --Position_; }
             bool equal(iterator const& other) const
             {
                 return Position_ == other.Position_;
             }
-            Parameter& dereference() const { return *Position_; }
+            const Parameter& dereference() const { return *Position_; }
     };
 
-    iterator begin() const { return iterator(Parameters_.begin()); }
-    iterator end() const { return iterator(Parameters_.end()); }
+    iterator begin() const { return iterator(Parameters_.cbegin()); }
+    iterator end() const { return iterator(Parameters_.cend()); }
     Parameter& operator[](const std::string& key) const;
 };
 
@@ -134,12 +139,12 @@ class ResultRow
 {
 private:
     const ResultSet& Owner_;
-    
+
 public:
     ResultRow(const ResultSet& owner)
     : Owner_(owner)
     { }
-    
+
     ResultRow(const ResultRow&) = delete;
     void operator= (const ResultRow&) = delete;
     template <typename T> T Get(const std::string& name) const;
@@ -157,30 +162,30 @@ private:
     struct Implementation;
     Implementation* Inner;
     ResultRow Data_;
-    
+
 public:
     ResultSet(const Command& command, bool data);
     ResultSet(ResultSet&& other);
     ~ResultSet();
     ResultSet(const ResultSet&) = delete;
     void operator= (const ResultSet&) = delete;
-    
+
     class iterator : public boost::iterator_facade<iterator, const ResultRow, boost::forward_traversal_tag>
     {
         public:
             iterator()
             : Owner_(nullptr), Done_(true)
             { }
-        
+
             iterator(const ResultSet* result, bool done)
             : Owner_(result), Done_(done)
             { }
-        
+
         private:
             friend class boost::iterator_core_access;
             const ResultSet* Owner_;
             bool Done_;
-            
+
             void increment();
             bool equal(iterator const& other) const;
             const ResultRow& dereference() const;
@@ -202,13 +207,13 @@ private:
     Implementation* Inner;
 
     explicit Command(const std::string& sql);
-    
+
 public:
-    Command(Command& other) = delete;
-    void operator= (Command& other) = delete;
+    Command(const Command& other) = delete;
+    void operator= (const Command& other) = delete;
     Command(Command&& other);
     ~Command();
-    
+
     const ParameterSet& Parameters() const;
     void Execute();
     template <typename T> T ExecuteScalar();
@@ -230,7 +235,7 @@ public:
     void operator= (Transaction& other) = delete;
     Transaction(Transaction&& other);
     ~Transaction();
-    
+
     void Commit();
     void Rollback();
 };
@@ -246,13 +251,13 @@ struct Configuration
         Wal,
         Off
     };
-    
+
     enum class IsolationLevel
     {
         Serializable,
         ReadUncommitted
     };
-    
+
     std::string Path;
     int BusyTimeout { 0 };
     int CacheSize { -2000 };
@@ -269,13 +274,13 @@ class Connection
 private:
     struct Implementation;
     Implementation* Inner;
-    
+
 public:
     explicit Connection(const Configuration& configuration);
     ~Connection();
     Connection(const Connection&) = delete;
     void operator=(const Connection&) = delete;
-    
+
     void Open();
     void OpenNew();
     void OpenAlways();
@@ -291,12 +296,12 @@ private:
     int Code_;
     int Line_;
     std::string File_;
-    
+
 public:
     sqlite_exception(const std::string& msg, int code, int line, const char* file)
     : runtime_error(msg), Code_(code), Line_(line), File_(file)
     { }
-    
+
     int code() const { return Code_; }
     int line() const { return Line_; }
     const char* where() const { return File_.c_str(); }
